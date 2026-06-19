@@ -1,0 +1,7 @@
+{
+  "name": "Later",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "react-vite"
+}
