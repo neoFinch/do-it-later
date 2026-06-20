@@ -1,4 +1,4 @@
-export type CaptureType = 'url' | 'note';
+export type CaptureType = 'url' | 'note' | 'file';
 
 export interface Capture {
   id: string;

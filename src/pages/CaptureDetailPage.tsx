@@ -17,6 +17,28 @@ import { useHistory, useParams } from 'react-router-dom';
 import { getCapture } from '../services/capture.service';
 import { useCaptureStore } from '../store/captureStore';
 import { Capture } from '../types/capture';
+import { useCapturePreview } from '../hooks/useCapturePreview';
+import { isImagePath, isLegacyLocalFilePath } from '../services/file.service';
+
+const CapturePreview: React.FC<{ capture: Capture }> = ({ capture }) => {
+  const previewUrl = useCapturePreview(capture);
+  const [hidden, setHidden] = useState(false);
+
+  if (!previewUrl || hidden) {
+    return null;
+  }
+
+  return (
+    <IonItem lines="none">
+      <img
+        src={previewUrl}
+        alt={capture.title ?? 'Capture preview'}
+        style={{ width: '100%', borderRadius: 8 }}
+        onError={() => setHidden(true)}
+      />
+    </IonItem>
+  );
+};
 
 const CaptureDetailPage: React.FC = () => {
   const history = useHistory();
@@ -64,6 +86,9 @@ const CaptureDetailPage: React.FC = () => {
     );
   }
 
+  const showLegacyPath =
+    capture.type === 'note' && !!capture.content && isLegacyLocalFilePath(capture.content);
+
   return (
     <IonPage>
       <IonHeader>
@@ -80,9 +105,10 @@ const CaptureDetailPage: React.FC = () => {
         </IonToolbar>
       </IonHeader>
       <IonContent fullscreen className="ion-padding">
+        <CapturePreview capture={capture} />
         <IonItem>
           <IonLabel>
-            <h2>{capture.title ?? (capture.type === 'url' ? capture.url : 'Untitled note')}</h2>
+            <h2>{capture.title ?? (capture.type === 'url' ? capture.url : 'Untitled capture')}</h2>
             <p>Type: {capture.type}</p>
           </IonLabel>
         </IonItem>
@@ -94,7 +120,16 @@ const CaptureDetailPage: React.FC = () => {
             </IonLabel>
           </IonItem>
         )}
-        {capture.content && (
+        {capture.type === 'file' && (
+          <IonItem>
+            <IonLabel>
+              <h3>File</h3>
+              <p>{capture.title ?? 'Shared file'}</p>
+              {capture.source && <p>{capture.source}</p>}
+            </IonLabel>
+          </IonItem>
+        )}
+        {capture.content && capture.type === 'note' && !showLegacyPath && (
           <IonItem>
             <IonLabel>
               <h3>Note</h3>
@@ -102,7 +137,19 @@ const CaptureDetailPage: React.FC = () => {
             </IonLabel>
           </IonItem>
         )}
-        {capture.source && (
+        {showLegacyPath && (
+          <IonItem>
+            <IonLabel>
+              <h3>Shared file</h3>
+              <p>
+                {isImagePath(capture.content!.trim().split('\n')[0])
+                  ? 'Shared image'
+                  : 'Local file saved before previews were supported.'}
+              </p>
+            </IonLabel>
+          </IonItem>
+        )}
+        {capture.source && capture.type !== 'file' && (
           <IonItem>
             <IonLabel>
               <h3>Source</h3>
@@ -110,8 +157,8 @@ const CaptureDetailPage: React.FC = () => {
             </IonLabel>
           </IonItem>
         )}
-        {capture.thumbnail && (
-          <IonItem>
+        {capture.thumbnail && capture.type === 'url' && (
+          <IonItem lines="none">
             <img src={capture.thumbnail} alt="Thumbnail" style={{ width: '100%', borderRadius: 8 }} />
           </IonItem>
         )}

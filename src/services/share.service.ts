@@ -1,6 +1,6 @@
 import { Capacitor } from '@capacitor/core';
 import { CapacitorShareTarget, ShareReceivedEvent } from '@capgo/capacitor-share-target';
-import { initializeCaptureService, createUrlCapture, createNoteCapture } from './capture.service';
+import { initializeCaptureService, createUrlCapture, createNoteCapture, createFileCapture } from './capture.service';
 import { useCaptureStore } from '../store/captureStore';
 
 let Toast: any = null;
@@ -22,16 +22,26 @@ const handleSharedText = async (event: ShareReceivedEvent): Promise<void> => {
   console.log('handleSharedText called', event);
   
   try {
-    // If there are files (images) shared, create a note capture referencing them.
     const files = event.files ?? [];
     if (files.length > 0) {
-      const paths = files
-        .map((f) => (typeof f?.uri === 'string' ? f.uri : JSON.stringify(f)))
-        .join('\n');
-      const title = event.title || 'Shared files';
-      await createNoteCapture(paths, title);
+      for (const file of files) {
+        if (typeof file?.uri !== 'string') {
+          continue;
+        }
+        await createFileCapture(
+          {
+            uri: file.uri,
+            name: file.name || 'shared_file',
+            mimeType: file.mimeType || 'application/octet-stream'
+          },
+          event.title || file.name || 'Shared file'
+        );
+      }
       if (Toast) {
-        await Toast.show({ text: 'Files captured!', duration: 'short' });
+        await Toast.show({
+          text: files.length === 1 ? 'File captured!' : `${files.length} files captured!`,
+          duration: 'short'
+        });
       }
       try {
         await useCaptureStore.getState().reload();

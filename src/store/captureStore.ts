@@ -27,6 +27,7 @@ export const useCaptureStore = create<CaptureState>((set, get) => ({
     await captureService.initializeCaptureService();
     const captures = await captureService.listCaptures();
     set({ captures, loading: false, initialized: true });
+    captureService.enrichStaleUrlCaptures(captures);
   },
   reload: async () => {
     console.log('CaptureStore: reload called');
@@ -34,6 +35,7 @@ export const useCaptureStore = create<CaptureState>((set, get) => ({
     const captures = await captureService.listCaptures();
     console.log('CaptureStore: reload finished, got', captures.length, 'captures');
     set({ captures, loading: false });
+    captureService.enrichStaleUrlCaptures(captures);
   },
   search: async (query: string) => {
     set({ loading: true });

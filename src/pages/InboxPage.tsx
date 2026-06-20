@@ -7,6 +7,7 @@ import {
   IonItem,
   IonLabel,
   IonList,
+  IonNote,
   IonPage,
   IonSearchbar,
   IonTitle,
@@ -15,12 +16,16 @@ import {
   IonSpinner,
   IonRefresher,
   IonRefresherContent,
-  IonIcon
+  IonIcon,
+  IonThumbnail
 } from '@ionic/react';
 import { useHistory } from 'react-router-dom';
-import { addOutline, refreshOutline } from 'ionicons/icons';
+import { addOutline, documentOutline, documentTextOutline, imageOutline, linkOutline, refreshOutline } from 'ionicons/icons';
 import { useCaptureStore } from '../store/captureStore';
 import { Capacitor } from '@capacitor/core';
+import { Capture } from '../types/capture';
+import { useCapturePreview } from '../hooks/useCapturePreview';
+import { isImageMime, isLegacyLocalFilePath } from '../services/file.service';
 
 // Toast is optional - may not be available on web
 let Toast: any = null;
@@ -31,6 +36,63 @@ if (Capacitor.getPlatform() !== 'web') {
     console.warn('Toast module not available', e);
   });
 }
+
+const getCaptureTitle = (capture: Capture): string => {
+  if (capture.title?.trim()) {
+    return capture.title;
+  }
+  if (capture.type === 'url') {
+    return capture.url ?? 'Saved link';
+  }
+  if (capture.type === 'file') {
+    return 'Shared file';
+  }
+  return 'Untitled note';
+};
+
+const getCaptureSubtitle = (capture: Capture): string => {
+  if (capture.type === 'url') {
+    return capture.url ?? '';
+  }
+  if (capture.type === 'file') {
+    return isImageMime(capture.source) ? 'Image' : capture.source ?? 'File';
+  }
+  if (capture.content && isLegacyLocalFilePath(capture.content)) {
+    return 'Shared file';
+  }
+  return capture.content ?? '';
+};
+
+const CaptureThumbnail: React.FC<{ capture: Capture }> = ({ capture }) => {
+  const previewUrl = useCapturePreview(capture);
+  const [hidden, setHidden] = useState(false);
+
+  if (previewUrl && !hidden) {
+    return (
+      <IonThumbnail slot="start">
+        <img src={previewUrl} alt="" onError={() => setHidden(true)} />
+      </IonThumbnail>
+    );
+  }
+
+  const icon =
+    capture.type === 'url'
+      ? linkOutline
+      : capture.type === 'file' && isImageMime(capture.source)
+        ? imageOutline
+        : capture.type === 'file'
+          ? documentOutline
+          : documentTextOutline;
+
+  return (
+    <IonIcon
+      slot="start"
+      icon={icon}
+      color="medium"
+      style={{ fontSize: '1.5rem', marginInlineEnd: '0.75rem' }}
+    />
+  );
+};
 
 const InboxPage: React.FC = () => {
   const history = useHistory();
@@ -106,11 +168,13 @@ const InboxPage: React.FC = () => {
           </div>
         ) : (
           <IonList>
-            {captures.map((capture: typeof captures[number]) => (
+            {captures.map((capture) => (
               <IonItem button key={capture.id} onClick={() => history.push(`/capture/${capture.id}`)}>
+                <CaptureThumbnail capture={capture} />
                 <IonLabel>
-                  <h2>{capture.title ?? (capture.type === 'url' ? capture.url : 'Untitled note')}</h2>
-                  <p>{capture.type === 'url' ? capture.url : capture.content}</p>
+                  <h2>{getCaptureTitle(capture)}</h2>
+                  <p>{getCaptureSubtitle(capture)}</p>
+                  {capture.source && capture.type !== 'file' && <IonNote color="medium">{capture.source}</IonNote>}
                 </IonLabel>
               </IonItem>
             ))}
