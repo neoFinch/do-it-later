@@ -1,6 +1,7 @@
 import { Capacitor } from '@capacitor/core';
 import { CapacitorShareTarget, ShareReceivedEvent } from '@capgo/capacitor-share-target';
 import { initializeCaptureService, createUrlCapture, createNoteCapture, createFileCapture } from './capture.service';
+import { extractFirstUrl } from './link.service';
 import { useCaptureStore } from '../store/captureStore';
 
 let Toast: any = null;
@@ -13,10 +14,7 @@ if (Capacitor.getPlatform() !== 'web') {
   });
 }
 
-const extractUrl = (text: string): string | null => {
-  const match = text.match(/https?:\/\/[^\s]+/i);
-  return match ? match[0] : null;
-};
+const extractUrl = (text: string): string | null => extractFirstUrl(text);
 
 const handleSharedText = async (event: ShareReceivedEvent): Promise<void> => {
   console.log('handleSharedText called', event);

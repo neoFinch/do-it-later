@@ -2,6 +2,7 @@ import { Capture } from '../types/capture';
 import * as repository from '../database/capture.repository';
 import { fetchUrlMetadata } from './metadata.service';
 import { deletePersistedFile, isImageMime, persistSharedFile, SharedFileInput } from './file.service';
+import { cleanTitle } from './title.service';
 import { useCaptureStore } from '../store/captureStore';
 
 export const initializeCaptureService = async (): Promise<void> => {
@@ -93,7 +94,7 @@ export const enrichUrlCapture = async (
       updates.source = metadata.source;
     }
     if (metadata.title && shouldReplaceTitle(existingTitle, url)) {
-      updates.title = metadata.title;
+      updates.title = cleanTitle(metadata.title);
     }
 
     if (Object.keys(updates).length === 0) {
@@ -125,13 +126,19 @@ export const enrichStaleUrlCaptures = (captures: Capture[]): void => {
   });
 };
 
+export const updateCaptureTitle = async (id: string, title: string): Promise<void> => {
+  const trimmed = title.trim();
+  await updateCapture(id, { title: trimmed ? trimmed : null });
+  await refreshInboxIfInitialized();
+};
+
 export const createUrlCapture = async (url: string, title?: string | null): Promise<string> => {
   const id = createId();
   await saveCapture({
     id,
     type: 'url',
     url: normalizeValue(url),
-    title: normalizeValue(title ?? url),
+    title: normalizeValue(title?.trim() ? cleanTitle(title) : url),
     content: null,
     source: null,
     thumbnail: null
@@ -145,7 +152,7 @@ export const createNoteCapture = async (content: string, title?: string | null):
     id: createId(),
     type: 'note',
     content: normalizeValue(content),
-    title: normalizeValue(title ?? content.trim().slice(0, 80)),
+    title: normalizeValue(cleanTitle(title ?? content.trim().slice(0, 200))),
     url: null,
     source: null,
     thumbnail: null
@@ -155,7 +162,7 @@ export const createNoteCapture = async (content: string, title?: string | null):
 export const createFileCapture = async (file: SharedFileInput, title?: string | null): Promise<string> => {
   const id = createId();
   const relativePath = await persistSharedFile(id, file);
-  const captureTitle = title?.trim() || file.name || 'Shared file';
+  const captureTitle = cleanTitle(title?.trim() || file.name || 'Shared file');
 
   await saveCapture({
     id,

@@ -20,12 +20,13 @@ import {
   IonThumbnail
 } from '@ionic/react';
 import { useHistory } from 'react-router-dom';
-import { addOutline, documentOutline, documentTextOutline, imageOutline, linkOutline, refreshOutline } from 'ionicons/icons';
+import { addOutline, documentOutline, documentTextOutline, imageOutline, linkOutline, openOutline, refreshOutline } from 'ionicons/icons';
 import { useCaptureStore } from '../store/captureStore';
 import { Capacitor } from '@capacitor/core';
 import { Capture } from '../types/capture';
 import { useCapturePreview } from '../hooks/useCapturePreview';
 import { isImageMime, isLegacyLocalFilePath } from '../services/file.service';
+import { openLink } from '../services/link.service';
 
 // Toast is optional - may not be available on web
 let Toast: any = null;
@@ -133,6 +134,15 @@ const InboxPage: React.FC = () => {
     }
   };
 
+  const handleOpenLink = async (event: React.MouseEvent, url: string) => {
+    event.stopPropagation();
+    try {
+      await openLink(url);
+    } catch (err) {
+      console.error('InboxPage: failed to open link', err);
+    }
+  };
+
   return (
     <IonPage>
       <IonHeader>
@@ -173,9 +183,19 @@ const InboxPage: React.FC = () => {
                 <CaptureThumbnail capture={capture} />
                 <IonLabel>
                   <h2>{getCaptureTitle(capture)}</h2>
-                  <p>{getCaptureSubtitle(capture)}</p>
+                  {/* <p>{getCaptureSubtitle(capture)}</p> */}
                   {capture.source && capture.type !== 'file' && <IonNote color="medium">{capture.source}</IonNote>}
                 </IonLabel>
+                {capture.type === 'url' && capture.url && (
+                  <IonButton
+                    slot="end"
+                    fill="clear"
+                    aria-label="Open link"
+                    onClick={(event) => handleOpenLink(event, capture.url!)}
+                  >
+                    <IonIcon icon={openOutline} slot="icon-only" />
+                  </IonButton>
+                )}
               </IonItem>
             ))}
           </IonList>

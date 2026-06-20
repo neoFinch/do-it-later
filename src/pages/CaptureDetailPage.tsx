@@ -5,6 +5,8 @@ import {
   IonButtons,
   IonContent,
   IonHeader,
+  IonIcon,
+  IonInput,
   IonItem,
   IonLabel,
   IonPage,
@@ -13,27 +15,37 @@ import {
   IonText,
   IonToast
 } from '@ionic/react';
+import { colorWandOutline, openOutline } from 'ionicons/icons';
 import { useHistory, useParams } from 'react-router-dom';
 import { getCapture } from '../services/capture.service';
 import { useCaptureStore } from '../store/captureStore';
 import { Capture } from '../types/capture';
 import { useCapturePreview } from '../hooks/useCapturePreview';
 import { isImagePath, isLegacyLocalFilePath } from '../services/file.service';
+import { getCaptureLink, getOpenLinkLabel, openLink } from '../services/link.service';
+import { suggestTitle } from '../services/title.service';
 
-const CapturePreview: React.FC<{ capture: Capture }> = ({ capture }) => {
+const CapturePreview: React.FC<{ capture: Capture; onOpenLink?: () => void }> = ({ capture, onOpenLink }) => {
   const previewUrl = useCapturePreview(capture);
   const [hidden, setHidden] = useState(false);
+  const link = getCaptureLink(capture);
+  const isClickable = !!link && !!onOpenLink;
 
   if (!previewUrl || hidden) {
     return null;
   }
 
   return (
-    <IonItem lines="none">
+    <IonItem
+      lines="none"
+      button={isClickable}
+      detail={false}
+      onClick={isClickable ? onOpenLink : undefined}
+    >
       <img
         src={previewUrl}
         alt={capture.title ?? 'Capture preview'}
-        style={{ width: '100%', borderRadius: 8 }}
+        style={{ width: '100%', borderRadius: 8, cursor: isClickable ? 'pointer' : 'default' }}
         onError={() => setHidden(true)}
       />
     </IonItem>
@@ -44,8 +56,9 @@ const CaptureDetailPage: React.FC = () => {
   const history = useHistory();
   const { id } = useParams<{ id: string }>();
   const [capture, setCapture] = useState<Capture | null>(null);
+  const [titleDraft, setTitleDraft] = useState('');
   const [toastMessage, setToastMessage] = useState('');
-  const { removeCapture } = useCaptureStore();
+  const { removeCapture, updateCaptureTitle } = useCaptureStore();
 
   useEffect(() => {
     const load = async () => {
@@ -54,6 +67,7 @@ const CaptureDetailPage: React.FC = () => {
       }
       const result = await getCapture(id);
       setCapture(result);
+      setTitleDraft(result?.title ?? '');
     };
 
     load();
@@ -66,6 +80,49 @@ const CaptureDetailPage: React.FC = () => {
     await removeCapture(capture.id);
     setToastMessage('Capture deleted.');
     history.push('/');
+  };
+
+  const handleOpenLink = async () => {
+    if (!capture) {
+      return;
+    }
+
+    const link = getCaptureLink(capture);
+    if (!link) {
+      return;
+    }
+
+    try {
+      await openLink(link);
+    } catch (error) {
+      console.error('Failed to open capture link', error);
+      setToastMessage('Could not open link.');
+    }
+  };
+
+  const handleSaveTitle = async () => {
+    if (!capture) {
+      return;
+    }
+
+    try {
+      await updateCaptureTitle(capture.id, titleDraft);
+      setCapture({ ...capture, title: titleDraft.trim() || null });
+      setToastMessage('Title saved.');
+    } catch (error) {
+      console.error('Failed to save title', error);
+      setToastMessage('Could not save title.');
+    }
+  };
+
+  const handleCleanTitle = () => {
+    const source = titleDraft || capture?.title || capture?.content || '';
+    const cleaned = suggestTitle(source);
+    if (!cleaned) {
+      setToastMessage('Nothing to clean up.');
+      return;
+    }
+    setTitleDraft(cleaned);
   };
 
   if (!capture) {
@@ -86,8 +143,11 @@ const CaptureDetailPage: React.FC = () => {
     );
   }
 
+  const captureLink = getCaptureLink(capture);
   const showLegacyPath =
     capture.type === 'note' && !!capture.content && isLegacyLocalFilePath(capture.content);
+  const savedTitle = capture.title ?? '';
+  const titleChanged = titleDraft.trim() !== savedTitle.trim();
 
   return (
     <IonPage>
@@ -105,18 +165,40 @@ const CaptureDetailPage: React.FC = () => {
         </IonToolbar>
       </IonHeader>
       <IonContent fullscreen className="ion-padding">
-        <CapturePreview capture={capture} />
+        <CapturePreview capture={capture} onOpenLink={captureLink ? handleOpenLink : undefined} />
+        {captureLink && (
+          <IonButton expand="block" onClick={handleOpenLink} className="ion-margin-bottom">
+            <IonIcon icon={openOutline} slot="start" />
+            {getOpenLinkLabel(captureLink)}
+          </IonButton>
+        )}
         <IonItem>
+          <IonLabel position="stacked">Title</IonLabel>
+          <IonInput
+            value={titleDraft}
+            placeholder="Add a title"
+            onIonInput={(event) => setTitleDraft(event.detail.value ?? '')}
+          />
+        </IonItem>
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+          <IonButton expand="block" fill="outline" onClick={handleCleanTitle}>
+            <IonIcon icon={colorWandOutline} slot="start" />
+            Clean up
+          </IonButton>
+          <IonButton expand="block" disabled={!titleChanged} onClick={handleSaveTitle}>
+            Save title
+          </IonButton>
+        </div>
+        <IonItem lines="none">
           <IonLabel>
-            <h2>{capture.title ?? (capture.type === 'url' ? capture.url : 'Untitled capture')}</h2>
             <p>Type: {capture.type}</p>
           </IonLabel>
         </IonItem>
         {capture.url && (
-          <IonItem>
+          <IonItem button detail={false} onClick={handleOpenLink}>
             <IonLabel>
               <h3>URL</h3>
-              <p>{capture.url}</p>
+              <p style={{ color: 'var(--ion-color-primary)' }}>{capture.url}</p>
             </IonLabel>
           </IonItem>
         )}
@@ -124,8 +206,7 @@ const CaptureDetailPage: React.FC = () => {
           <IonItem>
             <IonLabel>
               <h3>File</h3>
-              <p>{capture.title ?? 'Shared file'}</p>
-              {capture.source && <p>{capture.source}</p>}
+              <p>{capture.source ?? 'Shared file'}</p>
             </IonLabel>
           </IonItem>
         )}
@@ -155,11 +236,6 @@ const CaptureDetailPage: React.FC = () => {
               <h3>Source</h3>
               <p>{capture.source}</p>
             </IonLabel>
-          </IonItem>
-        )}
-        {capture.thumbnail && capture.type === 'url' && (
-          <IonItem lines="none">
-            <img src={capture.thumbnail} alt="Thumbnail" style={{ width: '100%', borderRadius: 8 }} />
           </IonItem>
         )}
         <IonText color="medium">Saved {new Date(capture.createdAt).toLocaleString()}</IonText>

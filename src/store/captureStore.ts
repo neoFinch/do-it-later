@@ -12,6 +12,7 @@ interface CaptureState {
   addUrlCapture: (url: string, title?: string | null) => Promise<void>;
   addNoteCapture: (content: string, title?: string | null) => Promise<void>;
   removeCapture: (id: string) => Promise<void>;
+  updateCaptureTitle: (id: string, title: string) => Promise<void>;
 }
 
 export const useCaptureStore = create<CaptureState>((set, get) => ({
@@ -52,6 +53,10 @@ export const useCaptureStore = create<CaptureState>((set, get) => ({
   },
   removeCapture: async (id: string) => {
     await captureService.deleteCapture(id);
+    await get().reload();
+  },
+  updateCaptureTitle: async (id: string, title: string) => {
+    await captureService.updateCaptureTitle(id, title);
     await get().reload();
   }
 }));
