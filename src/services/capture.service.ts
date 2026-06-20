@@ -1,4 +1,4 @@
-import { Capture } from '../types/capture';
+import { Capture, CaptureStatus } from '../types/capture';
 import * as repository from '../database/capture.repository';
 import { fetchUrlMetadata } from './metadata.service';
 import { deletePersistedFile, isImageMime, persistSharedFile, SharedFileInput } from './file.service';
@@ -9,8 +9,8 @@ export const initializeCaptureService = async (): Promise<void> => {
   await repository.initializeCaptureTable();
 };
 
-export const listCaptures = async (): Promise<Capture[]> => {
-  return repository.listCaptures();
+export const listCaptures = async (status?: CaptureStatus): Promise<Capture[]> => {
+  return repository.listCaptures(status);
 };
 
 export const getCapture = async (id: string): Promise<Capture | null> => {
@@ -25,11 +25,15 @@ export const deleteCapture = async (id: string): Promise<void> => {
   await repository.deleteCapture(id);
 };
 
-export const searchCaptures = async (query: string): Promise<Capture[]> => {
+export const searchCaptures = async (query: string, status?: CaptureStatus): Promise<Capture[]> => {
   if (!query.trim()) {
-    return repository.listCaptures();
+    return repository.listCaptures(status);
   }
-  return repository.searchCaptures(query);
+  return repository.searchCaptures(query, status);
+};
+
+export const countCapturesByStatus = async (): Promise<Record<CaptureStatus, number>> => {
+  return repository.countCapturesByStatus();
 };
 
 const createId = (): string => {
@@ -132,6 +136,11 @@ export const updateCaptureTitle = async (id: string, title: string): Promise<voi
   await refreshInboxIfInitialized();
 };
 
+export const updateCaptureStatus = async (id: string, status: CaptureStatus): Promise<void> => {
+  await updateCapture(id, { status });
+  await refreshInboxIfInitialized();
+};
+
 export const createUrlCapture = async (url: string, title?: string | null): Promise<string> => {
   const id = createId();
   await saveCapture({
@@ -141,7 +150,8 @@ export const createUrlCapture = async (url: string, title?: string | null): Prom
     title: normalizeValue(title?.trim() ? cleanTitle(title) : url),
     content: null,
     source: null,
-    thumbnail: null
+    thumbnail: null,
+    status: 'INBOX'
   });
   queueUrlCaptureEnrichment(id, url, title ?? url);
   return id;
@@ -155,7 +165,8 @@ export const createNoteCapture = async (content: string, title?: string | null):
     title: normalizeValue(cleanTitle(title ?? content.trim().slice(0, 200))),
     url: null,
     source: null,
-    thumbnail: null
+    thumbnail: null,
+    status: 'INBOX'
   });
 };
 
@@ -171,7 +182,8 @@ export const createFileCapture = async (file: SharedFileInput, title?: string | 
     content: normalizeValue(relativePath),
     source: normalizeValue(file.mimeType),
     url: null,
-    thumbnail: isImageMime(file.mimeType) ? normalizeValue(relativePath) : null
+    thumbnail: isImageMime(file.mimeType) ? normalizeValue(relativePath) : null,
+    status: 'INBOX'
   });
 
   return id;

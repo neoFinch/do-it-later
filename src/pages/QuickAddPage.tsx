@@ -103,7 +103,7 @@ const QuickAddPage: React.FC = () => {
                 onIonInput={(e) => setUrl(e.detail.value ?? '')}
               />
             </IonItem>
-            <IonButton expand="block" onClick={saveUrl} className="ion-margin-top">
+            <IonButton expand="block" color="primary" onClick={saveUrl} className="ion-margin-top">
               Save Link
             </IonButton>
           </>
@@ -121,7 +121,7 @@ const QuickAddPage: React.FC = () => {
                 onIonInput={(e) => setNote(e.detail.value ?? '')}
               />
             </IonItem>
-            <IonButton expand="block" onClick={saveNote} className="ion-margin-top">
+            <IonButton expand="block" color="success" onClick={saveNote} className="ion-margin-top">
               Save Note
             </IonButton>
           </>

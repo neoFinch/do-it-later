@@ -16,6 +16,42 @@ if (Capacitor.getPlatform() !== 'web') {
 
 const extractUrl = (text: string): string | null => extractFirstUrl(text);
 
+const SHARE_DEDUP_WINDOW_MS = 5000;
+let shareListenerInitialized = false;
+const recentShares = new Map<string, number>();
+
+const getShareDedupKey = (event: ShareReceivedEvent): string => {
+  const files = event.files ?? [];
+  if (files.length > 0) {
+    return files.map((file) => file.uri).filter(Boolean).join('|');
+  }
+
+  const sharedText = event.texts?.find((text) => !!text?.trim()) ?? '';
+  const url = extractUrl(sharedText);
+  return url ?? sharedText.trim();
+};
+
+const isDuplicateShare = (key: string): boolean => {
+  if (!key) {
+    return false;
+  }
+
+  const now = Date.now();
+  const lastSeen = recentShares.get(key);
+  if (lastSeen !== undefined && now - lastSeen < SHARE_DEDUP_WINDOW_MS) {
+    return true;
+  }
+
+  recentShares.set(key, now);
+  for (const [seenKey, seenAt] of recentShares) {
+    if (now - seenAt >= SHARE_DEDUP_WINDOW_MS) {
+      recentShares.delete(seenKey);
+    }
+  }
+
+  return false;
+};
+
 const handleSharedText = async (event: ShareReceivedEvent): Promise<void> => {
   console.log('handleSharedText called', event);
   
@@ -93,11 +129,22 @@ export const initializeShareService = async (): Promise<void> => {
     return;
   }
 
+  if (shareListenerInitialized) {
+    return;
+  }
+
   try {
     await initializeCaptureService();
+    await CapacitorShareTarget.removeAllListeners();
     await CapacitorShareTarget.addListener('shareReceived', async (event) => {
+      const dedupKey = getShareDedupKey(event);
+      if (isDuplicateShare(dedupKey)) {
+        console.log('Skipping duplicate share event', dedupKey);
+        return;
+      }
       await handleSharedText(event);
     });
+    shareListenerInitialized = true;
   } catch (error) {
     console.warn('Failed to initialize share target listener', error);
   }

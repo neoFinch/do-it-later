@@ -1,22 +1,45 @@
 import { create } from 'zustand';
-import { Capture } from '../types/capture';
+import { Capture, CaptureStatus } from '../types/capture';
 import * as captureService from '../services/capture.service';
+
+const EMPTY_STATUS_COUNTS: Record<CaptureStatus, number> = {
+  INBOX: 0,
+  REVIEWED: 0,
+  ARCHIVED: 0
+};
 
 interface CaptureState {
   captures: Capture[];
+  statusFilter: CaptureStatus;
+  statusCounts: Record<CaptureStatus, number>;
   loading: boolean;
   initialized: boolean;
   init: () => Promise<void>;
   reload: () => Promise<void>;
+  setStatusFilter: (status: CaptureStatus) => Promise<void>;
   search: (query: string) => Promise<void>;
   addUrlCapture: (url: string, title?: string | null) => Promise<void>;
   addNoteCapture: (content: string, title?: string | null) => Promise<void>;
   removeCapture: (id: string) => Promise<void>;
   updateCaptureTitle: (id: string, title: string) => Promise<void>;
+  updateCaptureStatus: (id: string, status: CaptureStatus) => Promise<void>;
 }
+
+const loadCapturesAndCounts = async (status: CaptureStatus, query?: string) => {
+  const [captures, statusCounts] = await Promise.all([
+    query?.trim()
+      ? captureService.searchCaptures(query, status)
+      : captureService.listCaptures(status),
+    captureService.countCapturesByStatus()
+  ]);
+
+  return { captures, statusCounts };
+};
 
 export const useCaptureStore = create<CaptureState>((set, get) => ({
   captures: [],
+  statusFilter: 'INBOX',
+  statusCounts: EMPTY_STATUS_COUNTS,
   loading: false,
   initialized: false,
   init: async () => {
@@ -26,22 +49,30 @@ export const useCaptureStore = create<CaptureState>((set, get) => ({
 
     set({ loading: true });
     await captureService.initializeCaptureService();
-    const captures = await captureService.listCaptures();
-    set({ captures, loading: false, initialized: true });
+    const { statusFilter } = get();
+    const { captures, statusCounts } = await loadCapturesAndCounts(statusFilter);
+    set({ captures, statusCounts, loading: false, initialized: true });
     captureService.enrichStaleUrlCaptures(captures);
   },
   reload: async () => {
     console.log('CaptureStore: reload called');
     set({ loading: true });
-    const captures = await captureService.listCaptures();
+    const { statusFilter } = get();
+    const { captures, statusCounts } = await loadCapturesAndCounts(statusFilter);
     console.log('CaptureStore: reload finished, got', captures.length, 'captures');
-    set({ captures, loading: false });
+    set({ captures, statusCounts, loading: false });
     captureService.enrichStaleUrlCaptures(captures);
+  },
+  setStatusFilter: async (status: CaptureStatus) => {
+    set({ statusFilter: status, loading: true });
+    const { captures, statusCounts } = await loadCapturesAndCounts(status);
+    set({ captures, statusCounts, loading: false });
   },
   search: async (query: string) => {
     set({ loading: true });
-    const captures = await captureService.searchCaptures(query);
-    set({ captures, loading: false });
+    const { statusFilter } = get();
+    const { captures, statusCounts } = await loadCapturesAndCounts(statusFilter, query);
+    set({ captures, statusCounts, loading: false });
   },
   addUrlCapture: async (url: string, title?: string | null) => {
     await captureService.createUrlCapture(url, title);
@@ -57,6 +88,10 @@ export const useCaptureStore = create<CaptureState>((set, get) => ({
   },
   updateCaptureTitle: async (id: string, title: string) => {
     await captureService.updateCaptureTitle(id, title);
+    await get().reload();
+  },
+  updateCaptureStatus: async (id: string, status: CaptureStatus) => {
+    await captureService.updateCaptureStatus(id, status);
     await get().reload();
   }
 }));

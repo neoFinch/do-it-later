@@ -27,6 +27,7 @@
     "@capacitor/filesystem": "^8.1.2",
     "@capacitor/haptics": "8.0.2",
     "@capacitor/keyboard": "8.0.5",
+    "@capacitor/share": "^8.0.1",
     "@capacitor/status-bar": "8.0.2",
     "@capacitor/toast": "^8.0.1",
     "@capgo/capacitor-share-target": "^8.0.41",

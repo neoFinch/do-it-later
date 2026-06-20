@@ -17,13 +17,15 @@ import {
   IonRefresher,
   IonRefresherContent,
   IonIcon,
-  IonThumbnail
+  IonThumbnail,
+  IonSegment,
+  IonSegmentButton
 } from '@ionic/react';
 import { useHistory } from 'react-router-dom';
-import { addOutline, documentOutline, documentTextOutline, imageOutline, linkOutline, openOutline, refreshOutline } from 'ionicons/icons';
+import { addOutline, documentOutline, documentTextOutline, imageOutline, linkOutline, openOutline, refreshOutline, settingsOutline } from 'ionicons/icons';
 import { useCaptureStore } from '../store/captureStore';
 import { Capacitor } from '@capacitor/core';
-import { Capture } from '../types/capture';
+import { Capture, CaptureStatus } from '../types/capture';
 import { useCapturePreview } from '../hooks/useCapturePreview';
 import { isImageMime, isLegacyLocalFilePath } from '../services/file.service';
 import { openLink } from '../services/link.service';
@@ -95,10 +97,26 @@ const CaptureThumbnail: React.FC<{ capture: Capture }> = ({ capture }) => {
   );
 };
 
+const STATUS_LABELS: Record<CaptureStatus, string> = {
+  INBOX: 'Inbox',
+  REVIEWED: 'Reviewed',
+  ARCHIVED: 'Archived'
+};
+
+const getEmptyStateMessage = (status: CaptureStatus): string => {
+  if (status === 'INBOX') {
+    return 'No captures yet. Use Quick Add or share a URL to save content.';
+  }
+  if (status === 'REVIEWED') {
+    return 'No reviewed captures yet. Mark items as reviewed from their detail page.';
+  }
+  return 'No archived captures yet. Archive items you want to keep but hide from your inbox.';
+};
+
 const InboxPage: React.FC = () => {
   const history = useHistory();
   const [searchTerm, setSearchTerm] = useState('');
-  const { captures, loading, init, search, reload } = useCaptureStore();
+  const { captures, loading, init, search, reload, statusFilter, statusCounts, setStatusFilter } = useCaptureStore();
 
   useEffect(() => {
     (async () => {
@@ -114,6 +132,15 @@ const InboxPage: React.FC = () => {
     const value = (event.detail.value ?? '').toString();
     setSearchTerm(value);
     await search(value);
+  };
+
+  const onStatusChange = async (event: CustomEvent) => {
+    const value = event.detail.value as CaptureStatus;
+    if (!value || value === statusFilter) {
+      return;
+    }
+    setSearchTerm('');
+    await setStatusFilter(value);
   };
 
   const doRefresh = async (event: CustomEvent) => {
@@ -147,15 +174,29 @@ const InboxPage: React.FC = () => {
     <IonPage>
       <IonHeader>
         <IonToolbar>
-          <IonTitle>Capture Inbox</IonTitle>
+          <IonTitle>LATER</IonTitle>
           <IonButtons slot="end">
-            <IonButton onClick={handleRefreshClick} aria-label="Refresh">
+            <IonButton color="medium" onClick={() => history.push('/settings')} aria-label="Data settings">
+              <IonIcon icon={settingsOutline} slot="icon-only" />
+            </IonButton>
+            <IonButton color="medium" onClick={handleRefreshClick} aria-label="Refresh">
               <IonIcon icon={refreshOutline} slot="icon-only" />
             </IonButton>
-            <IonButton onClick={() => history.push('/quick-add')} aria-label="Add capture">
+            <IonButton color="primary" onClick={() => history.push('/quick-add')} aria-label="Add capture">
               <IonIcon icon={addOutline} slot="icon-only" />
             </IonButton>
           </IonButtons>
+        </IonToolbar>
+        <IonToolbar>
+          <IonSegment value={statusFilter} onIonChange={onStatusChange}>
+            {(Object.keys(STATUS_LABELS) as CaptureStatus[]).map((status) => (
+              <IonSegmentButton key={status} value={status}>
+                <IonLabel>
+                  {STATUS_LABELS[status]} ({statusCounts[status]})
+                </IonLabel>
+              </IonSegmentButton>
+            ))}
+          </IonSegment>
         </IonToolbar>
       </IonHeader>
       <IonContent fullscreen>
@@ -174,7 +215,7 @@ const InboxPage: React.FC = () => {
           </div>
         ) : captures.length === 0 ? (
           <div style={{ padding: '1.5rem' }}>
-            <IonText color="medium">No captures yet. Use Quick Add or share a URL to save content.</IonText>
+            <IonText color="medium">{getEmptyStateMessage(statusFilter)}</IonText>
           </div>
         ) : (
           <IonList>
@@ -190,6 +231,7 @@ const InboxPage: React.FC = () => {
                   <IonButton
                     slot="end"
                     fill="clear"
+                    color="primary"
                     aria-label="Open link"
                     onClick={(event) => handleOpenLink(event, capture.url!)}
                   >

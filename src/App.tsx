@@ -7,6 +7,7 @@ import { IonReactRouter } from '@ionic/react-router';
 import InboxPage from './pages/InboxPage';
 import QuickAddPage from './pages/QuickAddPage';
 import CaptureDetailPage from './pages/CaptureDetailPage';
+import SettingsPage from './pages/SettingsPage';
 
 /* Core CSS required for Ionic components to work properly */
 import '@ionic/react/css/core.css';
@@ -47,6 +48,9 @@ const App: React.FC = () => {
           </Route>
           <Route exact path="/capture/:id">
             <CaptureDetailPage />
+          </Route>
+          <Route exact path="/settings">
+            <SettingsPage />
           </Route>
           <Route>
             <Redirect to="/" />

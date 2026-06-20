@@ -15,11 +15,11 @@ import {
   IonText,
   IonToast
 } from '@ionic/react';
-import { colorWandOutline, openOutline } from 'ionicons/icons';
+import { colorWandOutline, openOutline, archiveOutline, checkmarkCircleOutline, arrowUndoOutline } from 'ionicons/icons';
 import { useHistory, useParams } from 'react-router-dom';
 import { getCapture } from '../services/capture.service';
 import { useCaptureStore } from '../store/captureStore';
-import { Capture } from '../types/capture';
+import { Capture, CaptureStatus } from '../types/capture';
 import { useCapturePreview } from '../hooks/useCapturePreview';
 import { isImagePath, isLegacyLocalFilePath } from '../services/file.service';
 import { getCaptureLink, getOpenLinkLabel, openLink } from '../services/link.service';
@@ -58,7 +58,7 @@ const CaptureDetailPage: React.FC = () => {
   const [capture, setCapture] = useState<Capture | null>(null);
   const [titleDraft, setTitleDraft] = useState('');
   const [toastMessage, setToastMessage] = useState('');
-  const { removeCapture, updateCaptureTitle } = useCaptureStore();
+  const { removeCapture, updateCaptureTitle, updateCaptureStatus } = useCaptureStore();
 
   useEffect(() => {
     const load = async () => {
@@ -125,6 +125,21 @@ const CaptureDetailPage: React.FC = () => {
     setTitleDraft(cleaned);
   };
 
+  const handleStatusChange = async (status: CaptureStatus, message: string) => {
+    if (!capture) {
+      return;
+    }
+
+    try {
+      await updateCaptureStatus(capture.id, status);
+      setCapture({ ...capture, status });
+      setToastMessage(message);
+    } catch (error) {
+      console.error('Failed to update capture status', error);
+      setToastMessage('Could not update status.');
+    }
+  };
+
   if (!capture) {
     return (
       <IonPage>
@@ -167,7 +182,7 @@ const CaptureDetailPage: React.FC = () => {
       <IonContent fullscreen className="ion-padding">
         <CapturePreview capture={capture} onOpenLink={captureLink ? handleOpenLink : undefined} />
         {captureLink && (
-          <IonButton expand="block" onClick={handleOpenLink} className="ion-margin-bottom">
+          <IonButton expand="block" color="primary" onClick={handleOpenLink} className="ion-margin-bottom">
             <IonIcon icon={openOutline} slot="start" />
             {getOpenLinkLabel(captureLink)}
           </IonButton>
@@ -181,13 +196,68 @@ const CaptureDetailPage: React.FC = () => {
           />
         </IonItem>
         <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
-          <IonButton expand="block" fill="outline" onClick={handleCleanTitle}>
+          <IonButton expand="block" fill="outline" color="tertiary" onClick={handleCleanTitle}>
             <IonIcon icon={colorWandOutline} slot="start" />
             Clean up
           </IonButton>
-          <IonButton expand="block" disabled={!titleChanged} onClick={handleSaveTitle}>
+          <IonButton expand="block" color="primary" disabled={!titleChanged} onClick={handleSaveTitle}>
             Save title
           </IonButton>
+        </div>
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+          {capture.status === 'INBOX' && (
+            <>
+              <IonButton
+                expand="block"
+                color="success"
+                onClick={() => handleStatusChange('REVIEWED', 'Marked as reviewed.')}
+              >
+                <IonIcon icon={checkmarkCircleOutline} slot="start" />
+                Mark reviewed
+              </IonButton>
+              <IonButton
+                expand="block"
+                fill="outline"
+                color="medium"
+                onClick={() => handleStatusChange('ARCHIVED', 'Capture archived.')}
+              >
+                <IonIcon icon={archiveOutline} slot="start" />
+                Archive
+              </IonButton>
+            </>
+          )}
+          {capture.status === 'REVIEWED' && (
+            <>
+              <IonButton
+                expand="block"
+                fill="outline"
+                color="primary"
+                onClick={() => handleStatusChange('INBOX', 'Moved back to inbox.')}
+              >
+                <IonIcon icon={arrowUndoOutline} slot="start" />
+                Move to inbox
+              </IonButton>
+              <IonButton
+                expand="block"
+                fill="outline"
+                color="medium"
+                onClick={() => handleStatusChange('ARCHIVED', 'Capture archived.')}
+              >
+                <IonIcon icon={archiveOutline} slot="start" />
+                Archive
+              </IonButton>
+            </>
+          )}
+          {capture.status === 'ARCHIVED' && (
+            <IonButton
+              expand="block"
+              color="primary"
+              onClick={() => handleStatusChange('INBOX', 'Capture restored to inbox.')}
+            >
+              <IonIcon icon={arrowUndoOutline} slot="start" />
+              Restore to inbox
+            </IonButton>
+          )}
         </div>
         <IonItem lines="none">
           <IonLabel>
