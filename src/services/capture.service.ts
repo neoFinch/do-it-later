@@ -2,7 +2,7 @@ import { Capture, CaptureStatus } from '../types/capture';
 import * as repository from '../database/capture.repository';
 import { fetchUrlMetadata } from './metadata.service';
 import { deletePersistedFile, isImageMime, persistSharedFile, SharedFileInput } from './file.service';
-import { cleanTitle } from './title.service';
+import { cleanTitle, isDirtyShareTitle } from './title.service';
 import { useCaptureStore } from '../store/captureStore';
 
 export const initializeCaptureService = async (): Promise<void> => {
@@ -97,8 +97,10 @@ export const enrichUrlCapture = async (
     if (metadata.source) {
       updates.source = metadata.source;
     }
-    if (metadata.title && shouldReplaceTitle(existingTitle, url)) {
+    if (metadata.title && (shouldReplaceTitle(existingTitle, url) || isDirtyShareTitle(existingTitle, url))) {
       updates.title = cleanTitle(metadata.title);
+    } else if (existingTitle && isDirtyShareTitle(existingTitle, url)) {
+      updates.title = cleanTitle(existingTitle);
     }
 
     if (Object.keys(updates).length === 0) {
@@ -128,6 +130,32 @@ export const enrichStaleUrlCaptures = (captures: Capture[]): void => {
   stale.slice(0, 5).forEach((capture) => {
     queueUrlCaptureEnrichment(capture.id, capture.url!, capture.title);
   });
+};
+
+export const refreshDirtyCaptureTitles = async (): Promise<void> => {
+  const captures = await listCaptures();
+  let updated = 0;
+
+  await Promise.all(
+    captures.map(async (capture) => {
+      if (!capture.title?.trim() || !isDirtyShareTitle(capture.title, capture.url ?? '')) {
+        return;
+      }
+
+      const cleaned = cleanTitle(capture.title);
+      const nextTitle = cleaned || null;
+      if (nextTitle === capture.title) {
+        return;
+      }
+
+      await updateCapture(capture.id, { title: nextTitle });
+      updated += 1;
+    })
+  );
+
+  if (updated > 0) {
+    await refreshInboxIfInitialized();
+  }
 };
 
 export const updateCaptureTitle = async (id: string, title: string): Promise<void> => {

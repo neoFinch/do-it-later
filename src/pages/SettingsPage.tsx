@@ -14,6 +14,7 @@ import {
 } from '@ionic/react';
 import { downloadOutline, cloudUploadOutline } from 'ionicons/icons';
 import { exportCaptures, importCaptures } from '../services/backup.service';
+import { seedMockCaptures } from '../services/seed.service';
 import { useCaptureStore } from '../store/captureStore';
 
 const SettingsPage: React.FC = () => {
@@ -37,6 +38,23 @@ const SettingsPage: React.FC = () => {
 
   const handleImportClick = () => {
     fileInputRef.current?.click();
+  };
+
+  const handleLoadSampleData = async (replace: boolean) => {
+    setBusy(true);
+    try {
+      const result = await seedMockCaptures({ replace });
+      await reload();
+      const action = replace ? 'Replaced with' : 'Loaded';
+      setToastMessage(
+        `${action} sample data: ${result.imported} added, ${result.skipped} skipped, ${result.failed} invalid.`
+      );
+    } catch (error) {
+      console.error('Sample data load failed', error);
+      setToastMessage('Failed to load sample data.');
+    } finally {
+      setBusy(false);
+    }
   };
 
   const handleImportFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -107,6 +125,36 @@ const SettingsPage: React.FC = () => {
           hidden
           onChange={handleImportFile}
         />
+        {import.meta.env.DEV && (
+          <>
+            <IonText color="medium">
+              <p className="ion-margin-top">
+                Development: load captures from <code>mock-data/mock-capture-data.json</code> for UI
+                testing.
+              </p>
+            </IonText>
+            <IonButton
+              expand="block"
+              fill="outline"
+              color="tertiary"
+              disabled={busy}
+              onClick={() => handleLoadSampleData(false)}
+              className="ion-margin-top"
+            >
+              Load sample data
+            </IonButton>
+            <IonButton
+              expand="block"
+              fill="outline"
+              color="warning"
+              disabled={busy}
+              onClick={() => handleLoadSampleData(true)}
+              className="ion-margin-top"
+            >
+              Replace with sample data
+            </IonButton>
+          </>
+        )}
         <IonToast isOpen={!!toastMessage} message={toastMessage} duration={2500} onDidDismiss={() => setToastMessage('')} />
       </IonContent>
     </IonPage>

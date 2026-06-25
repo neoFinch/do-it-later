@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { Capture, CaptureStatus } from '../types/capture';
 import * as captureService from '../services/capture.service';
+import { seedMockCapturesIfEmpty } from '../services/seed.service';
 
 const EMPTY_STATUS_COUNTS: Record<CaptureStatus, number> = {
   INBOX: 0,
@@ -49,10 +50,14 @@ export const useCaptureStore = create<CaptureState>((set, get) => ({
 
     set({ loading: true });
     await captureService.initializeCaptureService();
+    if (import.meta.env.DEV) {
+      await seedMockCapturesIfEmpty();
+    }
     const { statusFilter } = get();
     const { captures, statusCounts } = await loadCapturesAndCounts(statusFilter);
     set({ captures, statusCounts, loading: false, initialized: true });
     captureService.enrichStaleUrlCaptures(captures);
+    void captureService.refreshDirtyCaptureTitles();
   },
   reload: async () => {
     console.log('CaptureStore: reload called');
@@ -62,6 +67,7 @@ export const useCaptureStore = create<CaptureState>((set, get) => ({
     console.log('CaptureStore: reload finished, got', captures.length, 'captures');
     set({ captures, statusCounts, loading: false });
     captureService.enrichStaleUrlCaptures(captures);
+    void captureService.refreshDirtyCaptureTitles();
   },
   setStatusFilter: async (status: CaptureStatus) => {
     set({ statusFilter: status, loading: true });

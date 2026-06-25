@@ -24,37 +24,8 @@ import { useCaptureStore } from '../store/captureStore';
 import { Capture } from '../types/capture';
 import { useCapturePreview } from '../hooks/useCapturePreview';
 import { getCaptureLink, openLink } from '../services/link.service';
-
-const getCaptureTitle = (capture: Capture): string => {
-  if (capture.title?.trim()) {
-    return capture.title;
-  }
-  if (capture.type === 'url') {
-    return capture.url ?? 'Saved link';
-  }
-  if (capture.type === 'file') {
-    return 'Shared file';
-  }
-  return 'Untitled note';
-};
-
-const formatSavedAt = (createdAt: number): string => {
-  const date = new Date(createdAt);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-  if (diffDays === 0) {
-    return 'Saved today';
-  }
-  if (diffDays === 1) {
-    return 'Saved yesterday';
-  }
-  if (diffDays < 7) {
-    return `Saved ${diffDays} days ago`;
-  }
-  return `Saved ${date.toLocaleDateString()}`;
-};
+import { getCaptureDisplayTitle } from '../services/title.service';
+import { formatRelativeSavedAt } from '../utils/format-date';
 
 const ReviewPreview: React.FC<{
   capture: Capture;
@@ -375,7 +346,7 @@ const ReviewQueuePage: React.FC = () => {
             />
             <div>
               <IonText>
-                <h2 style={{ margin: '0 0 0.5rem', fontSize: '1.25rem', lineHeight: 1.3 }}>{getCaptureTitle(current)}</h2>
+                <h2 style={{ margin: '0 0 0.5rem', fontSize: '1.25rem', lineHeight: 1.3 }}>{getCaptureDisplayTitle(current)}</h2>
               </IonText>
               {current.source && current.type !== 'file' && (
                 <IonText color="medium">
@@ -383,7 +354,7 @@ const ReviewQueuePage: React.FC = () => {
                 </IonText>
               )}
               <IonText color="medium">
-                <p style={{ margin: '0.25rem 0 0', fontSize: '0.875rem' }}>{formatSavedAt(current.createdAt)}</p>
+                <p style={{ margin: '0.25rem 0 0', fontSize: '0.875rem' }}>{formatRelativeSavedAt(current.createdAt)}</p>
               </IonText>
             </div>
 

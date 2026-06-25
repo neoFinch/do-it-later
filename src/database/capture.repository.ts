@@ -136,6 +136,16 @@ export const saveCapture = async (capture: Capture): Promise<void> => {
   );
 };
 
+export const clearAllCaptures = async (): Promise<void> => {
+  if (isWeb) {
+    writeStorage([]);
+    return;
+  }
+
+  const db = await getDatabase();
+  await db.run('DELETE FROM captures;', [], true);
+};
+
 export const deleteCapture = async (id: string): Promise<void> => {
   if (isWeb) {
     const items = readStorage();

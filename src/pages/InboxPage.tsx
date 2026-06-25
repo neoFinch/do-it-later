@@ -4,10 +4,7 @@ import {
   IonButtons,
   IonContent,
   IonHeader,
-  IonItem,
-  IonLabel,
   IonList,
-  IonNote,
   IonPage,
   IonSearchbar,
   IonTitle,
@@ -17,85 +14,21 @@ import {
   IonRefresher,
   IonRefresherContent,
   IonIcon,
-  IonThumbnail,
   IonSegment,
-  IonSegmentButton
+  IonSegmentButton,
+  IonLabel
 } from '@ionic/react';
 import { useHistory } from 'react-router-dom';
-import { addOutline, documentOutline, documentTextOutline, imageOutline, linkOutline, openOutline, playOutline, refreshOutline, settingsOutline } from 'ionicons/icons';
+import { addOutline, gridOutline, listOutline, playOutline, refreshOutline, settingsOutline } from 'ionicons/icons';
 import { useCaptureStore } from '../store/captureStore';
-import { Capacitor } from '@capacitor/core';
 import { Capture, CaptureStatus } from '../types/capture';
-import { useCapturePreview } from '../hooks/useCapturePreview';
-import { isImageMime, isLegacyLocalFilePath } from '../services/file.service';
-import { openLink } from '../services/link.service';
+import CaptureListItem from '../components/CaptureListItem';
+import CaptureGrid from '../components/CaptureGrid';
+import './InboxPage.css';
 
-// Toast is optional - may not be available on web
-let Toast: any = null;
-if (Capacitor.getPlatform() !== 'web') {
-  import('@capacitor/toast').then(module => {
-    Toast = module.Toast;
-  }).catch(e => {
-    console.warn('Toast module not available', e);
-  });
-}
+type InboxViewMode = 'list' | 'grid';
 
-const getCaptureTitle = (capture: Capture): string => {
-  if (capture.title?.trim()) {
-    return capture.title;
-  }
-  if (capture.type === 'url') {
-    return capture.url ?? 'Saved link';
-  }
-  if (capture.type === 'file') {
-    return 'Shared file';
-  }
-  return 'Untitled note';
-};
-
-const getCaptureSubtitle = (capture: Capture): string => {
-  if (capture.type === 'url') {
-    return capture.url ?? '';
-  }
-  if (capture.type === 'file') {
-    return isImageMime(capture.source) ? 'Image' : capture.source ?? 'File';
-  }
-  if (capture.content && isLegacyLocalFilePath(capture.content)) {
-    return 'Shared file';
-  }
-  return capture.content ?? '';
-};
-
-const CaptureThumbnail: React.FC<{ capture: Capture }> = ({ capture }) => {
-  const previewUrl = useCapturePreview(capture);
-  const [hidden, setHidden] = useState(false);
-
-  if (previewUrl && !hidden) {
-    return (
-      <IonThumbnail slot="start">
-        <img src={previewUrl} alt="" onError={() => setHidden(true)} />
-      </IonThumbnail>
-    );
-  }
-
-  const icon =
-    capture.type === 'url'
-      ? linkOutline
-      : capture.type === 'file' && isImageMime(capture.source)
-        ? imageOutline
-        : capture.type === 'file'
-          ? documentOutline
-          : documentTextOutline;
-
-  return (
-    <IonIcon
-      slot="start"
-      icon={icon}
-      color="medium"
-      style={{ fontSize: '1.5rem', marginInlineEnd: '0.75rem' }}
-    />
-  );
-};
+const VIEW_MODE_KEY = 'later:inbox-view-mode';
 
 const STATUS_LABELS: Record<CaptureStatus, string> = {
   INBOX: 'Inbox',
@@ -113,9 +46,19 @@ const getEmptyStateMessage = (status: CaptureStatus): string => {
   return 'No archived captures yet. Archive items you want to keep but hide from your inbox.';
 };
 
+const readViewMode = (): InboxViewMode => {
+  try {
+    const stored = localStorage.getItem(VIEW_MODE_KEY);
+    return stored === 'grid' ? 'grid' : 'list';
+  } catch {
+    return 'list';
+  }
+};
+
 const InboxPage: React.FC = () => {
   const history = useHistory();
   const [searchTerm, setSearchTerm] = useState('');
+  const [viewMode, setViewMode] = useState<InboxViewMode>(readViewMode);
   const { captures, loading, init, search, reload, statusFilter, statusCounts, setStatusFilter } = useCaptureStore();
 
   useEffect(() => {
@@ -161,13 +104,20 @@ const InboxPage: React.FC = () => {
     }
   };
 
-  const handleOpenLink = async (event: React.MouseEvent, url: string) => {
-    event.stopPropagation();
-    try {
-      await openLink(url);
-    } catch (err) {
-      console.error('InboxPage: failed to open link', err);
-    }
+  const toggleViewMode = () => {
+    setViewMode((current) => {
+      const next = current === 'list' ? 'grid' : 'list';
+      try {
+        localStorage.setItem(VIEW_MODE_KEY, next);
+      } catch {
+        // ignore storage errors
+      }
+      return next;
+    });
+  };
+
+  const openCapture = (capture: Capture) => {
+    history.push(`/capture/${capture.id}`);
   };
 
   return (
@@ -208,15 +158,34 @@ const InboxPage: React.FC = () => {
         <IonRefresher slot="fixed" onIonRefresh={doRefresh}>
           <IonRefresherContent />
         </IonRefresher>
-        <IonSearchbar value={searchTerm} onIonChange={onSearch} placeholder="Search saved capture" />
-        {!loading && statusFilter === 'INBOX' && statusCounts.INBOX > 0 && !searchTerm && (
-          <div style={{ padding: '0 1rem 0.5rem' }}>
-            <IonButton expand="block" color="tertiary" onClick={() => history.push('/review')}>
-              <IonIcon icon={playOutline} slot="start" />
-              Review inbox ({statusCounts.INBOX})
+        <div className="inbox-search-row">
+          <IonSearchbar
+            className="inbox-search-row__search"
+            value={searchTerm}
+            onIonChange={onSearch}
+            placeholder="Search saved capture"
+          />
+          {statusCounts.INBOX > 0 && (
+            <IonButton
+              fill="clear"
+              color="tertiary"
+              className="inbox-search-row__action"
+              aria-label={`Review inbox (${statusCounts.INBOX})`}
+              onClick={() => history.push('/review')}
+            >
+              <IonIcon icon={playOutline} slot="icon-only" />
             </IonButton>
-          </div>
-        )}
+          )}
+          <IonButton
+            fill="clear"
+            color="medium"
+            className="inbox-search-row__action"
+            aria-label={viewMode === 'list' ? 'Switch to grid view' : 'Switch to list view'}
+            onClick={toggleViewMode}
+          >
+            <IonIcon icon={viewMode === 'list' ? gridOutline : listOutline} slot="icon-only" />
+          </IonButton>
+        </div>
         {loading ? (
           <div style={{ display: 'flex', justifyContent: 'center', padding: '1rem' }}>
             <IonSpinner name="crescent" />
@@ -225,28 +194,12 @@ const InboxPage: React.FC = () => {
           <div style={{ padding: '1.5rem' }}>
             <IonText color="medium">{getEmptyStateMessage(statusFilter)}</IonText>
           </div>
+        ) : viewMode === 'grid' ? (
+          <CaptureGrid captures={captures} onSelect={openCapture} />
         ) : (
-          <IonList>
+          <IonList lines="full">
             {captures.map((capture) => (
-              <IonItem button key={capture.id} onClick={() => history.push(`/capture/${capture.id}`)}>
-                <CaptureThumbnail capture={capture} />
-                <IonLabel>
-                  <h2>{getCaptureTitle(capture)}</h2>
-                  {/* <p>{getCaptureSubtitle(capture)}</p> */}
-                  {capture.source && capture.type !== 'file' && <IonNote color="medium">{capture.source}</IonNote>}
-                </IonLabel>
-                {capture.type === 'url' && capture.url && (
-                  <IonButton
-                    slot="end"
-                    fill="clear"
-                    color="primary"
-                    aria-label="Open link"
-                    onClick={(event) => handleOpenLink(event, capture.url!)}
-                  >
-                    <IonIcon icon={openOutline} slot="icon-only" />
-                  </IonButton>
-                )}
-              </IonItem>
+              <CaptureListItem key={capture.id} capture={capture} onSelect={openCapture} />
             ))}
           </IonList>
         )}

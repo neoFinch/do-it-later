@@ -1,0 +1,140 @@
+.capture-list-item {
+  --padding-start: 12px;
+  --padding-end: 8px;
+  --inner-padding-end: 0;
+  --min-height: 76px;
+}
+
+.capture-list-item__content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1;
+}
+
+.capture-list-item__media {
+  position: relative;
+  flex-shrink: 0;
+  width: 56px;
+  height: 56px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--ion-color-step-150, #2a2a2a);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.capture-list-item__media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.capture-list-item__media ion-icon {
+  font-size: 1.4rem;
+  color: var(--ion-color-medium);
+}
+
+.capture-list-item__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-block: 10px;
+}
+
+.capture-list-item__title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--ion-text-color);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.capture-list-item__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.capture-list-item__badge {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  line-height: 1;
+}
+
+.capture-list-item__badge ion-icon {
+  font-size: 0.85rem;
+}
+
+.capture-list-item__badge--youtube {
+  background: rgba(255, 0, 0, 0.16);
+  color: #ff6b6b;
+}
+
+.capture-list-item__badge--instagram {
+  background: rgba(225, 48, 108, 0.16);
+  color: #f472b6;
+}
+
+.capture-list-item__badge--tiktok {
+  background: rgba(0, 242, 234, 0.12);
+  color: #5eead4;
+}
+
+.capture-list-item__badge--twitter {
+  background: rgba(29, 155, 240, 0.16);
+  color: #60a5fa;
+}
+
+.capture-list-item__badge--reddit {
+  background: rgba(255, 69, 0, 0.16);
+  color: #fb923c;
+}
+
+.capture-list-item__badge--linkedin {
+  background: rgba(10, 102, 194, 0.16);
+  color: #60a5fa;
+}
+
+.capture-list-item__badge--note {
+  background: rgba(var(--ion-color-success-rgb), 0.16);
+  color: var(--ion-color-success);
+}
+
+.capture-list-item__badge--image,
+.capture-list-item__badge--file {
+  background: rgba(var(--ion-color-tertiary-rgb), 0.16);
+  color: var(--ion-color-tertiary);
+}
+
+.capture-list-item__badge--generic,
+.capture-list-item__badge--link {
+  background: rgba(var(--ion-color-primary-rgb), 0.16);
+  color: var(--ion-color-primary);
+}
+
+.capture-list-item__date {
+  font-size: 0.75rem;
+  color: var(--ion-color-medium);
+  white-space: nowrap;
+}
+
+.capture-list-item__open {
+  margin: 0;
+  align-self: center;
+}
