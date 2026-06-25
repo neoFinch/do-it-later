@@ -1,3 +1,33 @@
+.inbox-status-segment {
+  --background: transparent;
+}
+
+.inbox-status-segment ion-segment-button {
+  --padding-top: 8px;
+  --padding-bottom: 8px;
+  --padding-start: 4px;
+  --padding-end: 4px;
+  min-width: 0;
+  flex: 1;
+}
+
+.inbox-status-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
+.inbox-status-tab ion-icon {
+  font-size: 1.15rem;
+}
+
+.inbox-status-tab__count {
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
 .inbox-search-row {
   display: flex;
   align-items: center;

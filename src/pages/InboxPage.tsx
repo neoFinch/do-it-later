@@ -15,11 +15,10 @@ import {
   IonRefresherContent,
   IonIcon,
   IonSegment,
-  IonSegmentButton,
-  IonLabel
+  IonSegmentButton
 } from '@ionic/react';
 import { useHistory } from 'react-router-dom';
-import { addOutline, gridOutline, listOutline, playOutline, refreshOutline, settingsOutline } from 'ionicons/icons';
+import { addOutline, archiveOutline, checkmarkCircleOutline, fileTrayFullOutline, gridOutline, listOutline, playOutline, refreshOutline, settingsOutline } from 'ionicons/icons';
 import { useCaptureStore } from '../store/captureStore';
 import { Capture, CaptureStatus } from '../types/capture';
 import CaptureListItem from '../components/CaptureListItem';
@@ -29,6 +28,12 @@ import './InboxPage.css';
 type InboxViewMode = 'list' | 'grid';
 
 const VIEW_MODE_KEY = 'later:inbox-view-mode';
+
+const STATUS_TABS: { status: CaptureStatus; icon: string; label: string }[] = [
+  { status: 'INBOX', icon: fileTrayFullOutline, label: 'Inbox' },
+  { status: 'REVIEWED', icon: checkmarkCircleOutline, label: 'Reviewed' },
+  { status: 'ARCHIVED', icon: archiveOutline, label: 'Archived' }
+];
 
 const STATUS_LABELS: Record<CaptureStatus, string> = {
   INBOX: 'Inbox',
@@ -138,12 +143,17 @@ const InboxPage: React.FC = () => {
           </IonButtons>
         </IonToolbar>
         <IonToolbar>
-          <IonSegment value={statusFilter} onIonChange={onStatusChange}>
-            {(Object.keys(STATUS_LABELS) as CaptureStatus[]).map((status) => (
-              <IonSegmentButton key={status} value={status}>
-                <IonLabel>
-                  {STATUS_LABELS[status]} ({statusCounts[status]})
-                </IonLabel>
+          <IonSegment className="inbox-status-segment" value={statusFilter} onIonChange={onStatusChange}>
+            {STATUS_TABS.map(({ status, icon, label }) => (
+              <IonSegmentButton
+                key={status}
+                value={status}
+                aria-label={`${label} (${statusCounts[status]})`}
+              >
+                <div className="inbox-status-tab">
+                  <IonIcon icon={icon} aria-hidden="true" />
+                  <span className="inbox-status-tab__count">{statusCounts[status]}</span>
+                </div>
               </IonSegmentButton>
             ))}
           </IonSegment>
