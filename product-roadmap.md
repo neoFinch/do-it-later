@@ -17,7 +17,7 @@ The long-term goal is not merely storing links but helping the user decide:
 
 # Bugs
 
-1. Sometimes on sharing a link, the item is added 2 times
+✅ 1. Sometimes on sharing a link, the item is added 2 times
 
 ---
 
@@ -64,9 +64,9 @@ Problem:
 
 Every saved item currently has equal importance.
 
-Features:
+Completed Features
 
-* Status Field
+✅ Status Field
 
 ```ts
 INBOX
@@ -74,10 +74,13 @@ REVIEWED
 ARCHIVED
 ```
 
-* Filter By Status
-* Archive Action
-* Restore Action
-* Inbox Counters
+✅ Filter By Status
+
+✅ Archive Action
+
+✅ Restore Action
+
+✅ Inbox Counters
 
 Example:
 
@@ -91,7 +94,7 @@ Archived (132)
 
 Success Criteria:
 
-User can actively manage saved content instead of accumulating an endless list.
+✅ User can actively manage saved content instead of accumulating an endless list.
 
 ---
 
@@ -105,23 +108,32 @@ Problem:
 
 Users save content faster than they consume it.
 
-Features:
+Completed Features
 
-* Review Screen
-* Next Item Navigation
-* Quick Actions
+✅ Review Screen
+
+✅ Next Item Navigation
+
+✅ Quick Actions
 
 ```text
-Open
+Open (overlay on preview)
 
-Reviewed
+Keep → Reviewed
 
-Archive
+Dismiss → Delete
 
 Skip
 ```
 
+✅ Inbox entry point (`Review inbox`)
+
+✅ Session summary and deferred skip handling
+
+Deferred:
+
 * Swipe Gestures (Optional)
+* Archive in review flow (available on capture detail page)
 
 Workflow:
 
@@ -135,7 +147,7 @@ Decision
 
 Success Criteria:
 
-Users can process large numbers of saved items quickly.
+✅ Users can process large numbers of saved items quickly.
 
 ---
 

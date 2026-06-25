@@ -22,7 +22,7 @@ import {
   IonSegmentButton
 } from '@ionic/react';
 import { useHistory } from 'react-router-dom';
-import { addOutline, documentOutline, documentTextOutline, imageOutline, linkOutline, openOutline, refreshOutline, settingsOutline } from 'ionicons/icons';
+import { addOutline, documentOutline, documentTextOutline, imageOutline, linkOutline, openOutline, playOutline, refreshOutline, settingsOutline } from 'ionicons/icons';
 import { useCaptureStore } from '../store/captureStore';
 import { Capacitor } from '@capacitor/core';
 import { Capture, CaptureStatus } from '../types/capture';
@@ -209,6 +209,14 @@ const InboxPage: React.FC = () => {
           <IonRefresherContent />
         </IonRefresher>
         <IonSearchbar value={searchTerm} onIonChange={onSearch} placeholder="Search saved capture" />
+        {!loading && statusFilter === 'INBOX' && statusCounts.INBOX > 0 && !searchTerm && (
+          <div style={{ padding: '0 1rem 0.5rem' }}>
+            <IonButton expand="block" color="tertiary" onClick={() => history.push('/review')}>
+              <IonIcon icon={playOutline} slot="start" />
+              Review inbox ({statusCounts.INBOX})
+            </IonButton>
+          </div>
+        )}
         {loading ? (
           <div style={{ display: 'flex', justifyContent: 'center', padding: '1rem' }}>
             <IonSpinner name="crescent" />
