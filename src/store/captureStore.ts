@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { Capture, CaptureStatus } from '../types/capture';
 import * as captureService from '../services/capture.service';
 import { seedMockCapturesIfEmpty } from '../services/seed.service';
+import { resetDatabase } from '../database/sqlite';
 
 const EMPTY_STATUS_COUNTS: Record<CaptureStatus, number> = {
   INBOX: 0,
@@ -24,6 +25,7 @@ interface CaptureState {
   removeCapture: (id: string) => Promise<void>;
   updateCaptureTitle: (id: string, title: string) => Promise<void>;
   updateCaptureStatus: (id: string, status: CaptureStatus) => Promise<void>;
+  repairDatabase: () => Promise<void>;
 }
 
 const loadCapturesAndCounts = async (status: CaptureStatus, query?: string) => {
@@ -49,25 +51,37 @@ export const useCaptureStore = create<CaptureState>((set, get) => ({
     }
 
     set({ loading: true });
-    await captureService.initializeCaptureService();
-    if (import.meta.env.DEV) {
-      await seedMockCapturesIfEmpty();
+    try {
+      await captureService.initializeCaptureService();
+      if (import.meta.env.DEV) {
+        await seedMockCapturesIfEmpty();
+      }
+      const { statusFilter } = get();
+      const { captures, statusCounts } = await loadCapturesAndCounts(statusFilter);
+      set({ captures, statusCounts, loading: false, initialized: true });
+      captureService.enrichStaleUrlCaptures(captures);
+      void captureService.refreshDirtyCaptureTitles();
+    } catch (error) {
+      console.error('CaptureStore: init failed', error);
+      set({ loading: false });
+      throw error;
     }
-    const { statusFilter } = get();
-    const { captures, statusCounts } = await loadCapturesAndCounts(statusFilter);
-    set({ captures, statusCounts, loading: false, initialized: true });
-    captureService.enrichStaleUrlCaptures(captures);
-    void captureService.refreshDirtyCaptureTitles();
   },
   reload: async () => {
     console.log('CaptureStore: reload called');
     set({ loading: true });
-    const { statusFilter } = get();
-    const { captures, statusCounts } = await loadCapturesAndCounts(statusFilter);
-    console.log('CaptureStore: reload finished, got', captures.length, 'captures');
-    set({ captures, statusCounts, loading: false });
-    captureService.enrichStaleUrlCaptures(captures);
-    void captureService.refreshDirtyCaptureTitles();
+    try {
+      const { statusFilter } = get();
+      const { captures, statusCounts } = await loadCapturesAndCounts(statusFilter);
+      console.log('CaptureStore: reload finished, got', captures.length, 'captures');
+      set({ captures, statusCounts, loading: false, initialized: true });
+      captureService.enrichStaleUrlCaptures(captures);
+      void captureService.refreshDirtyCaptureTitles();
+    } catch (error) {
+      console.error('CaptureStore: reload failed', error);
+      set({ loading: false });
+      throw error;
+    }
   },
   setStatusFilter: async (status: CaptureStatus) => {
     set({ statusFilter: status, loading: true });
@@ -82,11 +96,19 @@ export const useCaptureStore = create<CaptureState>((set, get) => ({
   },
   addUrlCapture: async (url: string, title?: string | null) => {
     await captureService.createUrlCapture(url, title);
-    await get().reload();
+    try {
+      await get().reload();
+    } catch (error) {
+      console.error('CaptureStore: reload after URL add failed', error);
+    }
   },
   addNoteCapture: async (content: string, title?: string | null) => {
     await captureService.createNoteCapture(content, title);
-    await get().reload();
+    try {
+      await get().reload();
+    } catch (error) {
+      console.error('CaptureStore: reload after note add failed', error);
+    }
   },
   removeCapture: async (id: string) => {
     await captureService.deleteCapture(id);
@@ -99,5 +121,10 @@ export const useCaptureStore = create<CaptureState>((set, get) => ({
   updateCaptureStatus: async (id: string, status: CaptureStatus) => {
     await captureService.updateCaptureStatus(id, status);
     await get().reload();
+  },
+  repairDatabase: async () => {
+    set({ loading: true, initialized: false, captures: [], statusCounts: EMPTY_STATUS_COUNTS });
+    await resetDatabase();
+    await get().init();
   }
 }));

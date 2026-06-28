@@ -2,6 +2,7 @@ import { Capacitor } from '@capacitor/core';
 import { App } from '@capacitor/app';
 import { Directory, Encoding, Filesystem } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
+import { FilePicker } from '@capawesome/capacitor-file-picker';
 import { Capture, CaptureStatus, CaptureType } from '../types/capture';
 import * as repository from '../database/capture.repository';
 
@@ -70,8 +71,91 @@ export const normalizeImportedCapture = (raw: unknown): Capture | null => {
   };
 };
 
+export const sanitizeBackupJsonText = (raw: string): string => {
+  return raw.replace(/^\uFEFF/, '').trim();
+};
+
+const decodeBase64Utf8 = (base64: string): string => {
+  const binary = atob(base64);
+  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  return new TextDecoder('utf-8').decode(bytes);
+};
+
+export const readBackupFileText = async (file: File): Promise<string> => {
+  if (file.size === 0) {
+    throw new Error('Selected file is empty.');
+  }
+
+  const text = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error ?? new Error('Could not read backup file.'));
+    reader.onload = () => {
+      if (typeof reader.result !== 'string') {
+        reject(new Error('Could not decode backup file as text.'));
+        return;
+      }
+      resolve(reader.result);
+    };
+    reader.readAsText(file);
+  });
+
+  return sanitizeBackupJsonText(text);
+};
+
+export const isImportPickCanceled = (error: unknown): boolean => {
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    message === 'No file selected.' ||
+    message.includes('pickFiles canceled') ||
+    message.includes('User cancelled') ||
+    message.includes('canceled')
+  );
+};
+
+export const pickBackupFileText = async (): Promise<string> => {
+  const result = await FilePicker.pickFiles({
+    limit: 1,
+    readData: true
+  });
+
+  if (!result.files.length) {
+    throw new Error('No file selected.');
+  }
+
+  const picked = result.files[0];
+
+  if (picked.data) {
+    return sanitizeBackupJsonText(decodeBase64Utf8(picked.data));
+  }
+
+  if (picked.blob) {
+    return sanitizeBackupJsonText(await picked.blob.text());
+  }
+
+  if (picked.path) {
+    const uri = Capacitor.convertFileSrc(picked.path);
+    const response = await fetch(uri);
+    if (!response.ok) {
+      throw new Error('Could not read selected backup file.');
+    }
+    return sanitizeBackupJsonText(await response.text());
+  }
+
+  throw new Error('Could not read selected backup file.');
+};
+
 export const parseBackupJson = (json: string): Capture[] => {
-  const parsed = JSON.parse(json) as unknown;
+  const trimmed = sanitizeBackupJsonText(json);
+  if (!trimmed) {
+    throw new Error('Backup file is empty.');
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(trimmed);
+  } catch {
+    throw new Error('Invalid JSON in backup file.');
+  }
 
   if (Array.isArray(parsed)) {
     return parsed;

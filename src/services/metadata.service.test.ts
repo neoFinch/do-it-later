@@ -40,4 +40,15 @@ describe('parseOpenGraphMetadata', () => {
       source: undefined
     });
   });
+
+  it('falls back to embedded JSON thumbnail when og meta tags are missing', () => {
+    const html =
+      '<script>{"display_url":"https://cdn.example.com/reel.jpg","caption":"Hello"}</script>';
+
+    expect(parseOpenGraphMetadata(html)).toEqual({
+      title: undefined,
+      thumbnail: 'https://cdn.example.com/reel.jpg',
+      source: undefined
+    });
+  });
 });
