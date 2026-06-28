@@ -1,12 +1,20 @@
 import { Capture, CaptureStatus } from '../types/capture';
 import * as repository from '../database/capture.repository';
+import { initializeAiAnalysisTable } from '../database/ai-analysis.repository';
+import { initializeContentDocumentTable } from '../database/content-document.repository';
+import { initializeCaptureProcessingTable } from '../database/processing.repository';
 import { fetchUrlMetadata } from './metadata.service';
 import { deletePersistedFile, isImageMime, persistSharedFile, SharedFileInput } from './file.service';
 import { cleanTitle, isDirtyShareTitle } from './title.service';
 import { useCaptureStore } from '../store/captureStore';
+import { deleteCaptureArtifacts, queueCaptureProcessing } from './processing.service';
+import { pickThumbnailUrl, resolveThumbnailForUrl } from './thumbnail.service';
 
 export const initializeCaptureService = async (): Promise<void> => {
   await repository.initializeCaptureTable();
+  await initializeContentDocumentTable();
+  await initializeAiAnalysisTable();
+  await initializeCaptureProcessingTable();
 };
 
 export const listCaptures = async (status?: CaptureStatus): Promise<Capture[]> => {
@@ -22,6 +30,7 @@ export const deleteCapture = async (id: string): Promise<void> => {
   if (existing?.type === 'file' && existing.content) {
     await deletePersistedFile(existing.content);
   }
+  await deleteCaptureArtifacts(id);
   await repository.deleteCapture(id);
 };
 
@@ -91,8 +100,9 @@ export const enrichUrlCapture = async (
     const metadata = await fetchUrlMetadata(url);
     const updates: Partial<Omit<Capture, 'id' | 'createdAt'>> = {};
 
-    if (metadata.thumbnail) {
-      updates.thumbnail = metadata.thumbnail;
+    const thumbnail = pickThumbnailUrl(url, [metadata.thumbnail]);
+    if (thumbnail) {
+      updates.thumbnail = thumbnail;
     }
     if (metadata.source) {
       updates.source = metadata.source;
@@ -111,20 +121,30 @@ export const enrichUrlCapture = async (
     await refreshInboxIfInitialized();
   } catch (error) {
     console.warn('Failed to enrich capture metadata', { id, url, error });
+
+    const fallbackThumbnail = resolveThumbnailForUrl(url);
+    if (!fallbackThumbnail) {
+      return;
+    }
+
+    const existing = await repository.getCaptureById(id);
+    if (existing?.thumbnail) {
+      return;
+    }
+
+    await updateCapture(id, { thumbnail: fallbackThumbnail });
+    await refreshInboxIfInitialized();
   }
 };
 
 const queueUrlCaptureEnrichment = (id: string, url: string, existingTitle?: string | null): void => {
   void enrichUrlCapture(id, url, existingTitle);
+  queueCaptureProcessing(id);
 };
 
 export const enrichStaleUrlCaptures = (captures: Capture[]): void => {
   const stale = captures.filter(
-    (capture) =>
-      capture.type === 'url' &&
-      !!capture.url &&
-      !capture.thumbnail &&
-      shouldReplaceTitle(capture.title, capture.url!)
+    (capture) => capture.type === 'url' && !!capture.url && !capture.thumbnail
   );
 
   stale.slice(0, 5).forEach((capture) => {
@@ -185,9 +205,10 @@ export const createUrlCapture = async (url: string, title?: string | null): Prom
   return id;
 };
 
-export const createNoteCapture = async (content: string, title?: string | null): Promise<void> => {
+export const createNoteCapture = async (content: string, title?: string | null): Promise<string> => {
+  const id = createId();
   await saveCapture({
-    id: createId(),
+    id,
     type: 'note',
     content: normalizeValue(content),
     title: normalizeValue(cleanTitle(title ?? content.trim().slice(0, 200))),
@@ -196,6 +217,8 @@ export const createNoteCapture = async (content: string, title?: string | null):
     thumbnail: null,
     status: 'INBOX'
   });
+  queueCaptureProcessing(id);
+  return id;
 };
 
 export const createFileCapture = async (file: SharedFileInput, title?: string | null): Promise<string> => {

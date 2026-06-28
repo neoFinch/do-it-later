@@ -18,7 +18,7 @@ export const useCapturePreview = (capture: Capture): string | null => {
     return () => {
       cancelled = true;
     };
-  }, [capture.id, capture.type, capture.content, capture.thumbnail, capture.source]);
+  }, [capture.id, capture.type, capture.content, capture.thumbnail, capture.source, capture.url]);
 
   return previewUrl;
 };

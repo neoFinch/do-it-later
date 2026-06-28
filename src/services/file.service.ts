@@ -1,6 +1,7 @@
 import { Capacitor } from '@capacitor/core';
 import { Directory, Filesystem } from '@capacitor/filesystem';
 import { Capture } from '../types/capture';
+import { resolveThumbnailForUrl } from './thumbnail.service';
 
 export interface SharedFileInput {
   uri: string;
@@ -50,8 +51,11 @@ export const getAbsoluteFilePreviewUrl = (absolutePath: string): string => {
 };
 
 export const resolveCapturePreviewUrl = async (capture: Capture): Promise<string | null> => {
-  if (capture.type === 'url' && capture.thumbnail) {
-    return capture.thumbnail;
+  if (capture.type === 'url') {
+    if (capture.thumbnail) {
+      return capture.thumbnail;
+    }
+    return resolveThumbnailForUrl(capture.url ?? '') ?? null;
   }
 
   if (capture.type === 'file' && capture.content && isImageMime(capture.source)) {

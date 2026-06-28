@@ -4,6 +4,7 @@ import {
   createBackupPayload,
   normalizeImportedCapture,
   parseBackupJson,
+  sanitizeBackupJsonText,
   serializeBackup
 } from './backup.service';
 import { Capture } from '../types/capture';
@@ -60,6 +61,20 @@ describe('backup.service', () => {
 
   it('throws for invalid backup json shape', () => {
     expect(() => parseBackupJson('{"foo":"bar"}')).toThrow('Invalid backup format');
+  });
+
+  it('strips BOM and whitespace before parsing', () => {
+    const json = `\uFEFF${serializeBackup([sampleCapture])}\n`;
+    const parsed = parseBackupJson(json);
+    expect(parsed).toHaveLength(1);
+  });
+
+  it('sanitizes backup text', () => {
+    expect(sanitizeBackupJsonText('\uFEFF  {"a":1}  ')).toBe('{"a":1}');
+  });
+
+  it('throws for empty backup files', () => {
+    expect(() => parseBackupJson('   ')).toThrow('Backup file is empty.');
   });
 
   it('builds android file url for share plugin', () => {

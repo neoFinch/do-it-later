@@ -17,18 +17,31 @@ if (Capacitor.getPlatform() !== 'web') {
 const extractUrl = (text: string): string | null => extractFirstUrl(text);
 
 const SHARE_DEDUP_WINDOW_MS = 5000;
-let shareListenerInitialized = false;
+let shareInitPromise: Promise<void> | null = null;
 const recentShares = new Map<string, number>();
 
+export const extractSharedText = (event: ShareReceivedEvent): string => {
+  const fromTexts = event.texts?.find((text) => !!text?.trim())?.trim() ?? '';
+  if (fromTexts) {
+    return fromTexts;
+  }
+
+  return event.title?.trim() ?? '';
+};
+
 const getShareDedupKey = (event: ShareReceivedEvent): string => {
+  const sharedText = extractSharedText(event);
+  const url = sharedText ? extractUrl(sharedText) : null;
+  if (url) {
+    return url;
+  }
+
   const files = event.files ?? [];
   if (files.length > 0) {
     return files.map((file) => file.uri).filter(Boolean).join('|');
   }
 
-  const sharedText = event.texts?.find((text) => !!text?.trim()) ?? '';
-  const url = extractUrl(sharedText);
-  return url ?? sharedText.trim();
+  return sharedText;
 };
 
 const isDuplicateShare = (key: string): boolean => {
@@ -54,9 +67,29 @@ const isDuplicateShare = (key: string): boolean => {
 
 const handleSharedText = async (event: ShareReceivedEvent): Promise<void> => {
   console.log('handleSharedText called', event);
-  
+
   try {
+    await initializeCaptureService();
     const files = event.files ?? [];
+    const sharedText = extractSharedText(event);
+    const url = sharedText ? extractUrl(sharedText) : null;
+
+    // Instagram often attaches a preview image plus the reel URL — prefer the link capture
+    // so metadata enrichment can fetch the thumbnail and title.
+    if (url) {
+      console.log('Creating URL capture for', url);
+      await createUrlCapture(url, event.title || sharedText || url);
+      if (Toast) {
+        await Toast.show({ text: 'URL captured!', duration: 'short' });
+      }
+      try {
+        await useCaptureStore.getState().reload();
+      } catch (e) {
+        console.warn('Failed to reload capture store after url share', e);
+      }
+      return;
+    }
+
     if (files.length > 0) {
       for (const file of files) {
         if (typeof file?.uri !== 'string') {
@@ -85,23 +118,10 @@ const handleSharedText = async (event: ShareReceivedEvent): Promise<void> => {
       return;
     }
 
-    const sharedText = event.texts?.find((text) => !!text?.trim()) ?? '';
     if (!sharedText) {
-      console.warn('No text found in share event');
-      return;
-    }
-
-    const url = extractUrl(sharedText);
-    if (url) {
-      console.log('Creating URL capture for', url);
-      await createUrlCapture(url, event.title || url);
+      console.warn('No text found in share event', event);
       if (Toast) {
-        await Toast.show({ text: 'URL captured!', duration: 'short' });
-      }
-      try {
-        await useCaptureStore.getState().reload();
-      } catch (e) {
-        console.warn('Failed to reload capture store after url share', e);
+        await Toast.show({ text: 'Nothing to capture from share', duration: 'short' }).catch(() => {});
       }
       return;
     }
@@ -129,13 +149,11 @@ export const initializeShareService = async (): Promise<void> => {
     return;
   }
 
-  if (shareListenerInitialized) {
-    return;
+  if (shareInitPromise) {
+    return shareInitPromise;
   }
 
-  try {
-    await initializeCaptureService();
-    await CapacitorShareTarget.removeAllListeners();
+  shareInitPromise = (async () => {
     await CapacitorShareTarget.addListener('shareReceived', async (event) => {
       const dedupKey = getShareDedupKey(event);
       if (isDuplicateShare(dedupKey)) {
@@ -144,16 +162,16 @@ export const initializeShareService = async (): Promise<void> => {
       }
       await handleSharedText(event);
     });
-    shareListenerInitialized = true;
+  })();
+
+  try {
+    await shareInitPromise;
   } catch (error) {
+    shareInitPromise = null;
     console.warn('Failed to initialize share target listener', error);
   }
 };
 
 export const cleanupShareService = async (): Promise<void> => {
-  try {
-    await CapacitorShareTarget.removeAllListeners();
-  } catch (error) {
-    console.warn('Failed to cleanup share target listeners', error);
-  }
+  shareInitPromise = null;
 };

@@ -1,0 +1,14 @@
+:root {
+  --app-content-bottom-inset: 16px;
+  --app-android-nav-height: 48px;
+}
+
+ion-content {
+  --padding-bottom: calc(var(--ion-safe-area-bottom, 0px) + var(--app-content-bottom-inset));
+}
+
+.plt-android ion-content {
+  --padding-bottom: calc(
+    max(var(--ion-safe-area-bottom, 0px), var(--app-android-nav-height)) + var(--app-content-bottom-inset)
+  );
+}

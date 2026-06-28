@@ -41,6 +41,13 @@ import { getCaptureLink, getOpenLinkLabel, openLink } from '../services/link.ser
 import { getCaptureDisplayTitle, suggestTitle, titlesAreEquivalent } from '../services/title.service';
 import { getCaptureSourceBadge, SourceBadgeVariant } from '../utils/capture-source';
 import { formatRelativeSavedAt } from '../utils/format-date';
+import { getCaptureUnderstanding, analyzeCapture } from '../services/processing.service';
+import { extractCapture } from '../services/extraction.service';
+import { AIAnalysis } from '../types/ai-analysis';
+import { CaptureProcessing } from '../types/capture-processing';
+import { ContentDocument } from '../types/content-document';
+import CaptureExtractedContent from '../components/CaptureExtractedContent';
+import CaptureUnderstanding from '../components/CaptureUnderstanding';
 import './CaptureDetailPage.css';
 
 const SOURCE_ICONS: Record<SourceBadgeVariant, string> = {
@@ -97,7 +104,19 @@ const CaptureDetailPage: React.FC = () => {
   const [capture, setCapture] = useState<Capture | null>(null);
   const [titleDraft, setTitleDraft] = useState('');
   const [toastMessage, setToastMessage] = useState('');
+  const [processing, setProcessing] = useState<CaptureProcessing | null>(null);
+  const [document, setDocument] = useState<ContentDocument | null>(null);
+  const [analysis, setAnalysis] = useState<AIAnalysis | null>(null);
+  const [extractionBusy, setExtractionBusy] = useState(false);
+  const [analysisBusy, setAnalysisBusy] = useState(false);
   const { removeCapture, updateCaptureTitle, updateCaptureStatus } = useCaptureStore();
+
+  const loadUnderstanding = async (captureId: string) => {
+    const result = await getCaptureUnderstanding(captureId);
+    setProcessing(result.processing);
+    setDocument(result.document);
+    setAnalysis(result.analysis);
+  };
 
   useEffect(() => {
     const load = async () => {
@@ -107,10 +126,35 @@ const CaptureDetailPage: React.FC = () => {
       const result = await getCapture(id);
       setCapture(result);
       setTitleDraft(result ? getCaptureDisplayTitle(result) : '');
+      if (result) {
+        await loadUnderstanding(result.id);
+      }
     };
 
     load();
   }, [id]);
+
+  useEffect(() => {
+    if (!id || !capture || capture.type === 'file') {
+      return;
+    }
+
+    const isActive =
+      processing?.extractionStatus === 'pending' ||
+      processing?.extractionStatus === 'processing' ||
+      processing?.analysisStatus === 'pending' ||
+      processing?.analysisStatus === 'processing';
+
+    if (!isActive) {
+      return;
+    }
+
+    const interval = window.setInterval(() => {
+      void loadUnderstanding(id);
+    }, 2000);
+
+    return () => window.clearInterval(interval);
+  }, [id, capture, processing?.extractionStatus, processing?.analysisStatus]);
 
   const deleteItem = async () => {
     if (!capture) {
@@ -179,6 +223,42 @@ const CaptureDetailPage: React.FC = () => {
     }
   };
 
+  const handleRetryExtraction = async () => {
+    if (!capture) {
+      return;
+    }
+
+    setExtractionBusy(true);
+    try {
+      await extractCapture(capture.id, { force: true });
+      await loadUnderstanding(capture.id);
+      setToastMessage('Extraction updated.');
+    } catch (error) {
+      console.error('Failed to extract capture', error);
+      setToastMessage('Extraction failed.');
+    } finally {
+      setExtractionBusy(false);
+    }
+  };
+
+  const handleAnalyze = async () => {
+    if (!capture) {
+      return;
+    }
+
+    setAnalysisBusy(true);
+    try {
+      await analyzeCapture(capture.id, { force: true });
+      await loadUnderstanding(capture.id);
+      setToastMessage('Content analysis updated.');
+    } catch (error) {
+      console.error('Failed to analyze capture', error);
+      setToastMessage('Analysis failed.');
+    } finally {
+      setAnalysisBusy(false);
+    }
+  };
+
   if (!capture) {
     return (
       <IonPage>
@@ -198,6 +278,8 @@ const CaptureDetailPage: React.FC = () => {
       </IonPage>
     );
   }
+
+  const showUnderstanding = capture.type !== 'file';
 
   const captureLink = getCaptureLink(capture);
   const badge = getCaptureSourceBadge(capture);
@@ -263,6 +345,23 @@ const CaptureDetailPage: React.FC = () => {
               </IonButton>
             </div>
           </section>
+
+          {showUnderstanding && (
+            <>
+              <CaptureExtractedContent
+                processing={processing}
+                document={document}
+                busy={extractionBusy}
+                onRetry={handleRetryExtraction}
+              />
+              <CaptureUnderstanding
+                processing={processing}
+                analysis={analysis}
+                busy={analysisBusy}
+                onAnalyze={handleAnalyze}
+              />
+            </>
+          )}
 
           <section className="capture-detail__section">
             <h2 className="capture-detail__label">Actions</h2>

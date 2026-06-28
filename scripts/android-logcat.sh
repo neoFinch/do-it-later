@@ -23,10 +23,11 @@ else
   # Common tags for Capacitor/Ionic WebView debugging
   adb logcat \
     Capacitor:V \
+    CapacitorSQLite:V \
     CapacitorShareTarget:D \
     chromium:V \
     cr_WebView:V \
     ActivityManager:I \
     System.out:I \
-    *:S
+    '*:S'
 fi

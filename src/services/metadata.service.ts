@@ -1,4 +1,5 @@
-import { Capacitor, CapacitorHttp } from '@capacitor/core';
+import { fetchRemoteText } from './http.service';
+import { pickThumbnailUrl } from './thumbnail.service';
 
 export interface UrlMetadata {
   title?: string;
@@ -6,7 +7,8 @@ export interface UrlMetadata {
   source?: string;
 }
 
-const FETCH_TIMEOUT_MS = 10_000;
+/** Instagram serves og:image to this UA; desktop Chrome gets a login shell without images. */
+export const METADATA_USER_AGENT = 'Mozilla/5.0 (compatible; CaptureInbox/1.0)';
 
 const decodeHtmlEntities = (text: string): string => {
   return text
@@ -33,18 +35,46 @@ const getMetaContent = (html: string, key: string, attr: 'property' | 'name' = '
   return value ? decodeHtmlEntities(value) : null;
 };
 
-export const parseOpenGraphMetadata = (html: string): UrlMetadata => {
+const decodeJsonString = (value: string): string => {
+  return decodeHtmlEntities(value.replace(/\\u0026/g, '&').replace(/\\\//g, '/'));
+};
+
+const extractEmbeddedThumbnail = (html: string): string | undefined => {
+  const patterns = [
+    /"og:image"\s*:\s*"([^"]+)"/,
+    /"display_url"\s*:\s*"([^"]+)"/,
+    /"thumbnail_src"\s*:\s*"([^"]+)"/
+  ];
+
+  for (const pattern of patterns) {
+    const match = html.match(pattern);
+    if (match?.[1]?.trim()) {
+      return decodeJsonString(match[1]);
+    }
+  }
+
+  return undefined;
+};
+
+export const parseOpenGraphMetadata = (html: string, pageUrl?: string): UrlMetadata => {
   const title =
     getMetaContent(html, 'og:title') ??
     getMetaContent(html, 'twitter:title', 'name') ??
     html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1]?.trim() ??
     undefined;
 
-  const thumbnail =
+  const thumbnailRaw =
     getMetaContent(html, 'og:image') ??
     getMetaContent(html, 'twitter:image', 'name') ??
     getMetaContent(html, 'twitter:image:src', 'name') ??
+    extractEmbeddedThumbnail(html) ??
     undefined;
+
+  const thumbnail = pageUrl
+    ? pickThumbnailUrl(pageUrl, [thumbnailRaw])
+    : thumbnailRaw
+      ? decodeHtmlEntities(thumbnailRaw)
+      : undefined;
 
   const source = getMetaContent(html, 'og:site_name') ?? undefined;
 
@@ -55,47 +85,19 @@ export const parseOpenGraphMetadata = (html: string): UrlMetadata => {
   };
 };
 
-const fetchPageHtml = async (url: string): Promise<string> => {
-  if (Capacitor.isNativePlatform()) {
-    const response = await CapacitorHttp.get({
-      url,
-      connectTimeout: FETCH_TIMEOUT_MS,
-      readTimeout: FETCH_TIMEOUT_MS,
-      responseType: 'text',
-      headers: {
-        Accept: 'text/html,application/xhtml+xml',
-        'User-Agent': 'Mozilla/5.0 (compatible; CaptureInbox/1.0)'
-      }
-    });
-
-    if (response.status >= 400) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-
-    return typeof response.data === 'string' ? response.data : String(response.data ?? '');
-  }
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-  try {
-    const response = await fetch(url, {
-      signal: controller.signal,
-      headers: {
-        Accept: 'text/html,application/xhtml+xml'
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-
-    return await response.text();
-  } finally {
-    clearTimeout(timeout);
-  }
+export const fetchPageHtml = async (url: string, userAgent = METADATA_USER_AGENT): Promise<string> => {
+  return fetchRemoteText(url, {
+    accept: 'text/html,application/xhtml+xml',
+    userAgent
+  });
 };
 
 export const fetchUrlMetadata = async (url: string): Promise<UrlMetadata> => {
-  const html = await fetchPageHtml(url);
-  return parseOpenGraphMetadata(html);
+  try {
+    const html = await fetchPageHtml(url);
+    return parseOpenGraphMetadata(html, url);
+  } catch {
+    const thumbnail = pickThumbnailUrl(url, []);
+    return thumbnail ? { thumbnail } : {};
+  }
 };
