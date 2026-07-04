@@ -1,4 +1,5 @@
 import { Capture, CaptureStatus } from '../types/capture';
+import { canonicalizeCaptureUrl } from '../services/link.service';
 import { getDatabase, initDatabase } from './sqlite';
 import { Capacitor } from '@capacitor/core';
 
@@ -89,6 +90,28 @@ export const listCaptures = async (status?: CaptureStatus): Promise<Capture[]> =
     : await db.query('SELECT * FROM captures ORDER BY createdAt DESC;');
   const values = result.values ?? [];
   return values.map(mapRowToCapture);
+};
+
+export const findUrlCaptureByUrl = async (url: string): Promise<Capture | null> => {
+  const canonical = canonicalizeCaptureUrl(url);
+
+  if (isWeb) {
+    const match = readStorage().find(
+      (capture) => capture.type === 'url' && !!capture.url && canonicalizeCaptureUrl(capture.url) === canonical
+    );
+    return match ?? null;
+  }
+
+  const db = await getDatabase();
+  const result = await db.query("SELECT * FROM captures WHERE type = 'url' AND url IS NOT NULL;");
+  for (const row of result.values ?? []) {
+    const capture = mapRowToCapture(row);
+    if (capture.url && canonicalizeCaptureUrl(capture.url) === canonical) {
+      return capture;
+    }
+  }
+
+  return null;
 };
 
 export const getCaptureById = async (id: string): Promise<Capture | null> => {

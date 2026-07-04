@@ -3,16 +3,8 @@ import { AIProvider, ProviderId } from './ai-provider.types';
 import { nullProvider } from './providers/null.provider';
 import { openAiProvider } from './providers/openai.provider';
 import { ollamaProvider } from './providers/ollama.provider';
-import { claudeProvider, geminiProvider, proxyProvider } from './providers/stub.provider';
 
-const providers: AIProvider[] = [
-  nullProvider,
-  openAiProvider,
-  ollamaProvider,
-  geminiProvider,
-  claudeProvider,
-  proxyProvider
-];
+const providers: AIProvider[] = [nullProvider, openAiProvider, ollamaProvider];
 
 const providerMap = new Map<ProviderId, AIProvider>(providers.map((provider) => [provider.id, provider]));
 

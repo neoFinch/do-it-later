@@ -1,4 +1,12 @@
-import { AIAnalysis, ContentType, Difficulty } from '../../types/ai-analysis';
+import {
+  AIAnalysis,
+  ContentType,
+  Difficulty,
+  ExpectationLevel,
+  ImplementationLevel,
+  LearningStyle,
+  ViewerExpectation
+} from '../../types/ai-analysis';
 import { ContentDocument } from '../../types/content-document';
 import { deriveReadingMinutes, deriveWatchMinutes } from './prompt-builder';
 
@@ -11,6 +19,9 @@ const VALID_CONTENT_TYPES: ContentType[] = [
   'opinion',
   'other'
 ];
+const VALID_IMPLEMENTATION_LEVELS: ImplementationLevel[] = ['none', 'low', 'medium', 'high'];
+const VALID_LEARNING_STYLES: LearningStyle[] = ['conceptual', 'mixed', 'practical'];
+const VALID_EXPECTATION_LEVELS: ExpectationLevel[] = ['low', 'medium', 'high'];
 
 const normalizeStringArray = (value: unknown): string[] => {
   if (!Array.isArray(value)) {
@@ -31,6 +42,38 @@ const normalizeContentType = (value: unknown): ContentType => {
     return value as ContentType;
   }
   return 'other';
+};
+
+const normalizeImplementationLevel = (value: unknown): ImplementationLevel => {
+  if (typeof value === 'string' && VALID_IMPLEMENTATION_LEVELS.includes(value as ImplementationLevel)) {
+    return value as ImplementationLevel;
+  }
+  return 'none';
+};
+
+const normalizeLearningStyle = (value: unknown): LearningStyle => {
+  if (typeof value === 'string' && VALID_LEARNING_STYLES.includes(value as LearningStyle)) {
+    return value as LearningStyle;
+  }
+  return 'conceptual';
+};
+
+const normalizeExpectationLevel = (value: unknown, fallback: ExpectationLevel = 'medium'): ExpectationLevel => {
+  if (typeof value === 'string' && VALID_EXPECTATION_LEVELS.includes(value as ExpectationLevel)) {
+    return value as ExpectationLevel;
+  }
+  return fallback;
+};
+
+const normalizeViewerExpectation = (value: unknown): ViewerExpectation => {
+  if (typeof value === 'object' && value) {
+    const record = value as Record<string, unknown>;
+    return {
+      youWillLearn: normalizeStringArray(record.youWillLearn),
+      youWillNotLearn: normalizeStringArray(record.youWillNotLearn)
+    };
+  }
+  return { youWillLearn: [], youWillNotLearn: [] };
 };
 
 const normalizeNullableNumber = (value: unknown): number | null => {
@@ -68,13 +111,18 @@ export const parseAnalysisResponse = (
     difficulty: normalizeDifficulty(raw.difficulty),
     targetAudience: normalizeStringArray(raw.targetAudience),
     contentType: normalizeContentType(raw.contentType),
-    containsCode: Boolean(raw.containsCode),
-    containsHandsOn: Boolean(raw.containsHandsOn),
+    implementationLevel: normalizeImplementationLevel(raw.implementationLevel),
+    learningStyle: normalizeLearningStyle(raw.learningStyle),
+    codeWalkthrough: Boolean(raw.codeWalkthrough),
+    viewerExpectation: normalizeViewerExpectation(raw.viewerExpectation),
+    expectedLearning: normalizeExpectationLevel(raw.expectedLearning, 'medium'),
+    potentialDisappointment: normalizeExpectationLevel(raw.potentialDisappointment, 'medium'),
+    recommendation: typeof raw.recommendation === 'string' ? raw.recommendation.trim() : '',
     estimatedReadingTime: normalizeNullableNumber(raw.estimatedReadingTime) ?? fallbackReadingTime,
     estimatedWatchTime: normalizeNullableNumber(raw.estimatedWatchTime) ?? fallbackWatchTime,
     prerequisites: normalizeStringArray(raw.prerequisites),
     learningOutcomes: normalizeStringArray(raw.learningOutcomes),
-    summary: typeof raw.summary === 'string' ? raw.summary.trim() : '',
+    summary: typeof raw.summary === 'string' ? raw.summary.trim() : typeof raw.recommendation === 'string' ? raw.recommendation.trim() : '',
     keyTakeaways: normalizeStringArray(raw.keyTakeaways),
     reasoning: typeof raw.reasoning === 'string' ? raw.reasoning.trim() : '',
     confidence: Number.isFinite(confidence) ? Math.min(1, Math.max(0, confidence)) : 0.5,

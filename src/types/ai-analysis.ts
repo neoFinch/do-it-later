@@ -8,14 +8,30 @@ export type ContentType =
   | 'opinion'
   | 'other';
 
+export type ImplementationLevel = 'none' | 'low' | 'medium' | 'high';
+
+export type LearningStyle = 'conceptual' | 'mixed' | 'practical';
+
+export type ExpectationLevel = 'low' | 'medium' | 'high';
+
+export interface ViewerExpectation {
+  youWillLearn: string[];
+  youWillNotLearn: string[];
+}
+
 export interface AIAnalysis {
   captureId: string;
   topics: string[];
   difficulty: Difficulty;
   targetAudience: string[];
   contentType: ContentType;
-  containsCode: boolean;
-  containsHandsOn: boolean;
+  implementationLevel: ImplementationLevel;
+  learningStyle: LearningStyle;
+  codeWalkthrough: boolean;
+  viewerExpectation: ViewerExpectation;
+  expectedLearning: ExpectationLevel;
+  potentialDisappointment: ExpectationLevel;
+  recommendation: string;
   estimatedReadingTime: number | null;
   estimatedWatchTime: number | null;
   prerequisites: string[];

@@ -2,7 +2,7 @@ import { Capacitor } from '@capacitor/core';
 import { CapacitorSQLite, SQLiteConnection, SQLiteDBConnection } from '@capacitor-community/sqlite';
 
 const DATABASE_NAME = 'capture_inbox';
-const DATABASE_VERSION = 2;
+const DATABASE_VERSION = 4;
 const DATABASE_MODE = 'no-encryption';
 
 let sqliteConnection: SQLiteConnection | null = null;
@@ -47,8 +47,14 @@ CREATE TABLE IF NOT EXISTS ai_analysis (
   difficulty TEXT NOT NULL,
   targetAudience TEXT NOT NULL,
   contentType TEXT NOT NULL,
-  containsCode INTEGER NOT NULL,
-  containsHandsOn INTEGER NOT NULL,
+  implementationLevel TEXT NOT NULL DEFAULT 'none',
+  learningStyle TEXT NOT NULL DEFAULT 'conceptual',
+  codeWalkthrough INTEGER NOT NULL DEFAULT 0,
+  viewerExpectationYouWillLearn TEXT NOT NULL DEFAULT '[]',
+  viewerExpectationYouWillNotLearn TEXT NOT NULL DEFAULT '[]',
+  expectedLearning TEXT NOT NULL DEFAULT 'medium',
+  potentialDisappointment TEXT NOT NULL DEFAULT 'medium',
+  recommendation TEXT NOT NULL DEFAULT '',
   estimatedReadingTime INTEGER,
   estimatedWatchTime INTEGER,
   prerequisites TEXT NOT NULL,
@@ -86,6 +92,91 @@ const migrateV2Tables = async (db: SQLiteDBConnection): Promise<void> => {
   await db.execute(createContentDocumentTable, false, false);
   await db.execute(createAiAnalysisTable, false, false);
   await db.execute(createCaptureProcessingTable, false, false);
+};
+
+const migrateAiAnalysisV3 = async (db: SQLiteDBConnection): Promise<void> => {
+  const tableInfo = await db.query('PRAGMA table_info(ai_analysis);');
+  const columns = (tableInfo.values ?? []).map((row: { name?: string }) => row.name);
+
+  if (columns.length === 0) {
+    return;
+  }
+
+  if (columns.includes('implementationLevel')) {
+    return;
+  }
+
+  await db.execute(
+    `CREATE TABLE ai_analysis_v3 (
+      captureId TEXT PRIMARY KEY NOT NULL,
+      topics TEXT NOT NULL,
+      difficulty TEXT NOT NULL,
+      targetAudience TEXT NOT NULL,
+      contentType TEXT NOT NULL,
+      implementationLevel TEXT NOT NULL DEFAULT 'none',
+      learningStyle TEXT NOT NULL DEFAULT 'conceptual',
+      codeWalkthrough INTEGER NOT NULL DEFAULT 0,
+      viewerExpectationYouWillLearn TEXT NOT NULL DEFAULT '[]',
+      viewerExpectationYouWillNotLearn TEXT NOT NULL DEFAULT '[]',
+      estimatedReadingTime INTEGER,
+      estimatedWatchTime INTEGER,
+      prerequisites TEXT NOT NULL,
+      learningOutcomes TEXT NOT NULL,
+      summary TEXT NOT NULL,
+      keyTakeaways TEXT NOT NULL,
+      reasoning TEXT NOT NULL,
+      confidence REAL NOT NULL,
+      analyzedAt INTEGER NOT NULL,
+      FOREIGN KEY (captureId) REFERENCES captures(id) ON DELETE CASCADE
+    );`,
+    false,
+    false
+  );
+
+  await db.execute(
+    `INSERT INTO ai_analysis_v3
+      (captureId, topics, difficulty, targetAudience, contentType,
+       implementationLevel, learningStyle, codeWalkthrough,
+       viewerExpectationYouWillLearn, viewerExpectationYouWillNotLearn,
+       estimatedReadingTime, estimatedWatchTime, prerequisites, learningOutcomes,
+       summary, keyTakeaways, reasoning, confidence, analyzedAt)
+     SELECT
+       captureId, topics, difficulty, targetAudience, contentType,
+       CASE WHEN containsHandsOn = 1 THEN 'medium' ELSE 'none' END,
+       CASE WHEN containsHandsOn = 1 THEN 'mixed' WHEN containsCode = 1 THEN 'mixed' ELSE 'conceptual' END,
+       containsCode,
+       '[]', '[]',
+       estimatedReadingTime, estimatedWatchTime, prerequisites, learningOutcomes,
+       summary, keyTakeaways, reasoning, confidence, analyzedAt
+     FROM ai_analysis;`,
+    false,
+    false
+  );
+
+  await db.execute('DROP TABLE ai_analysis;', false, false);
+  await db.execute('ALTER TABLE ai_analysis_v3 RENAME TO ai_analysis;', false, false);
+};
+
+const migrateAiAnalysisV4 = async (db: SQLiteDBConnection): Promise<void> => {
+  const tableInfo = await db.query('PRAGMA table_info(ai_analysis);');
+  const columns = (tableInfo.values ?? []).map((row: { name?: string }) => row.name);
+
+  if (columns.length === 0 || columns.includes('expectedLearning')) {
+    return;
+  }
+
+  await db.execute("ALTER TABLE ai_analysis ADD COLUMN expectedLearning TEXT NOT NULL DEFAULT 'medium';", false, false);
+  await db.execute(
+    "ALTER TABLE ai_analysis ADD COLUMN potentialDisappointment TEXT NOT NULL DEFAULT 'medium';",
+    false,
+    false
+  );
+  await db.execute("ALTER TABLE ai_analysis ADD COLUMN recommendation TEXT NOT NULL DEFAULT '';", false, false);
+  await db.execute(
+    "UPDATE ai_analysis SET recommendation = summary WHERE recommendation = '' AND summary != '';",
+    false,
+    false
+  );
 };
 
 const getSqliteConnection = (): SQLiteConnection => {
@@ -157,6 +248,8 @@ const initializeOnce = async (allowReset: boolean): Promise<void> => {
     await db.execute(createCaptureTable, false, false);
     await migrateCaptureTable(db);
     await migrateV2Tables(db);
+    await migrateAiAnalysisV3(db);
+    await migrateAiAnalysisV4(db);
   } catch (error) {
     await closeConnection();
     databaseReady = null;

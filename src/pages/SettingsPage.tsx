@@ -242,17 +242,6 @@ const SettingsPage: React.FC = () => {
             />
           </IonItem>
         )}
-        {providerId === 'proxy' && (
-          <IonItem>
-            <IonInput
-              label="Base URL"
-              labelPlacement="stacked"
-              value={baseUrl}
-              placeholder="https://your-proxy.example.com"
-              onIonInput={(event) => setBaseUrl(event.detail.value ?? '')}
-            />
-          </IonItem>
-        )}
         <IonItem lines="none">
           <IonLabel>Analyze new captures automatically</IonLabel>
           <IonToggle checked={autoAnalyze} onIonChange={(event) => setAutoAnalyze(event.detail.checked)} />

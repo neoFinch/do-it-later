@@ -3,7 +3,7 @@ export interface AnalysisPrompt {
   user: string;
 }
 
-export type ProviderId = 'null' | 'openai' | 'ollama' | 'gemini' | 'claude' | 'proxy';
+export type ProviderId = 'null' | 'openai' | 'ollama';
 
 export interface AIProvider {
   readonly id: ProviderId;

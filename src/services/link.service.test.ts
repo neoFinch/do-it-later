@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   detectLinkPlatform,
+  canonicalizeCaptureUrl,
   extractFirstUrl,
   extractYouTubeVideoId,
   getNativeAppUrl,
@@ -11,6 +12,16 @@ import {
 describe('link.service', () => {
   it('normalizes urls without protocol', () => {
     expect(normalizeUrl('example.com/page')).toBe('https://example.com/page');
+  });
+
+  it('canonicalizes urls for duplicate detection', () => {
+    expect(canonicalizeCaptureUrl('https://WWW.Example.com/page/')).toBe('https://example.com/page');
+    expect(canonicalizeCaptureUrl('example.com/page')).toBe('https://example.com/page');
+    expect(canonicalizeCaptureUrl('https://example.com/page#section')).toBe('https://example.com/page');
+    expect(canonicalizeCaptureUrl('https://www.youtube.com/watch?v=abc123&si=tracking')).toBe(
+      'https://youtube.com/watch?v=abc123'
+    );
+    expect(canonicalizeCaptureUrl('https://youtu.be/abc123/')).toBe('https://youtube.com/watch?v=abc123');
   });
 
   it('extracts the first url from text', () => {

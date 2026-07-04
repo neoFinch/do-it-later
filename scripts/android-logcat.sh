@@ -25,6 +25,7 @@ else
     Capacitor:V \
     CapacitorSQLite:V \
     CapacitorShareTarget:D \
+    ShareReceiveActivity:D \
     chromium:V \
     cr_WebView:V \
     ActivityManager:I \

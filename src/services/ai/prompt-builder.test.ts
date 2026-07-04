@@ -3,7 +3,7 @@ import { buildAnalysisPrompt } from './prompt-builder';
 import { ContentDocument } from '../../types/content-document';
 
 describe('prompt-builder', () => {
-  it('builds prompt from note content', () => {
+  it('builds decision-focused prompt from note content', () => {
     const document: ContentDocument = {
       captureId: 'note-1',
       source: 'note',
@@ -13,9 +13,12 @@ describe('prompt-builder', () => {
     };
 
     const prompt = buildAnalysisPrompt(document);
-    expect(prompt.system).toContain('personal learning inbox');
+    expect(prompt.system).toContain('decide whether saved content is worth their limited time');
+    expect(prompt.system).toContain('Do NOT output star ratings');
+    expect(prompt.user).toContain('expectedLearning');
+    expect(prompt.user).toContain('potentialDisappointment');
+    expect(prompt.user).toContain('viewerExpectation');
     expect(prompt.user).toContain('OAuth notes');
-    expect(prompt.user).toContain('Validate redirect URIs');
     expect(prompt.user).toContain('Estimated reading minutes');
   });
 
@@ -31,7 +34,6 @@ describe('prompt-builder', () => {
 
     const prompt = buildAnalysisPrompt(document);
     expect(prompt.user).toContain('Redis internals');
-    expect(prompt.user).toContain('Redis memory model');
     expect(prompt.user).toContain('Estimated watch minutes');
   });
 });

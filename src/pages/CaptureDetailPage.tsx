@@ -47,7 +47,7 @@ import { AIAnalysis } from '../types/ai-analysis';
 import { CaptureProcessing } from '../types/capture-processing';
 import { ContentDocument } from '../types/content-document';
 import CaptureExtractedContent from '../components/CaptureExtractedContent';
-import CaptureUnderstanding from '../components/CaptureUnderstanding';
+import AttentionScorecard from '../components/AttentionScorecard';
 import './CaptureDetailPage.css';
 
 const SOURCE_ICONS: Record<SourceBadgeVariant, string> = {
@@ -307,12 +307,12 @@ const CaptureDetailPage: React.FC = () => {
         <div className="capture-detail">
           <CaptureHero capture={capture} onOpenLink={captureLink ? handleOpenLink : undefined} />
 
-          {captureLink && (
+          {/* {captureLink && (
             <IonButton expand="block" color="primary" onClick={handleOpenLink}>
               <IonIcon icon={openOutline} slot="start" />
               {getOpenLinkLabel(captureLink)}
             </IonButton>
-          )}
+          )} */}
 
           <div className="capture-detail__meta">
             <span
@@ -354,7 +354,7 @@ const CaptureDetailPage: React.FC = () => {
                 busy={extractionBusy}
                 onRetry={handleRetryExtraction}
               />
-              <CaptureUnderstanding
+              <AttentionScorecard
                 processing={processing}
                 analysis={analysis}
                 busy={analysisBusy}

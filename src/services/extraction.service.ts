@@ -96,13 +96,9 @@ export const extractCapture = async (captureId: string, options?: { force?: bool
       await setExtractionStatus(captureId, 'completed', null);
 
       if (extraction.document.thumbnail && !capture.thumbnail && capture.type === 'url') {
-        const { updateCapture } = await import('./capture.service');
+        const { updateCapture, refreshInboxIfInitialized } = await import('./capture.service');
         await updateCapture(captureId, { thumbnail: extraction.document.thumbnail });
-        const { useCaptureStore } = await import('../store/captureStore');
-        const { initialized, reload } = useCaptureStore.getState();
-        if (initialized) {
-          await reload();
-        }
+        refreshInboxIfInitialized();
       }
 
       return extraction.document;
