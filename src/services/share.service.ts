@@ -1,8 +1,16 @@
 import { Capacitor } from '@capacitor/core';
+import { Directory, Encoding, Filesystem } from '@capacitor/filesystem';
 import { CapacitorShareTarget, ShareReceivedEvent } from '@capgo/capacitor-share-target';
 import { initializeCaptureService, createUrlCapture, createNoteCapture, createFileCapture } from './capture.service';
 import { extractFirstUrl } from './link.service';
 import { useCaptureStore } from '../store/captureStore';
+
+const LOG_TAG = '[ShareService]';
+const PENDING_SHARES_DIR = 'pending_shares';
+
+type HandleSharedTextOptions = {
+  showToast?: boolean;
+};
 
 let Toast: any = null;
 // Load Toast only on native platforms
@@ -18,7 +26,27 @@ const extractUrl = (text: string): string | null => extractFirstUrl(text);
 
 const SHARE_DEDUP_WINDOW_MS = 5000;
 let shareInitPromise: Promise<void> | null = null;
+let pendingSharesPromise: Promise<void> | null = null;
 const recentShares = new Map<string, number>();
+
+export const parsePendingSharePayload = (raw: string): ShareReceivedEvent | null => {
+  try {
+    const parsed = JSON.parse(raw) as Partial<ShareReceivedEvent>;
+    return {
+      title: typeof parsed.title === 'string' ? parsed.title : '',
+      texts: Array.isArray(parsed.texts) ? parsed.texts.filter((text): text is string => typeof text === 'string') : [],
+      files: Array.isArray(parsed.files)
+        ? parsed.files.filter(
+            (file): file is NonNullable<ShareReceivedEvent['files']>[number] =>
+              !!file && typeof file.uri === 'string'
+          )
+        : []
+    };
+  } catch (error) {
+    console.warn(`${LOG_TAG} Failed to parse pending share JSON`, error);
+    return null;
+  }
+};
 
 export const extractSharedText = (event: ShareReceivedEvent): string => {
   const fromTexts = event.texts?.find((text) => !!text?.trim())?.trim() ?? '';
@@ -65,8 +93,12 @@ const isDuplicateShare = (key: string): boolean => {
   return false;
 };
 
-const handleSharedText = async (event: ShareReceivedEvent): Promise<void> => {
-  console.log('handleSharedText called', event);
+const handleSharedText = async (
+  event: ShareReceivedEvent,
+  options: HandleSharedTextOptions = {}
+): Promise<void> => {
+  const showToast = options.showToast !== false;
+  console.log(`${LOG_TAG} handleSharedText`, event);
 
   try {
     await initializeCaptureService();
@@ -79,7 +111,7 @@ const handleSharedText = async (event: ShareReceivedEvent): Promise<void> => {
     if (url) {
       console.log('Creating URL capture for', url);
       await createUrlCapture(url, event.title || sharedText || url);
-      if (Toast) {
+      if (showToast && Toast) {
         await Toast.show({ text: 'URL captured!', duration: 'short' });
       }
       try {
@@ -104,7 +136,7 @@ const handleSharedText = async (event: ShareReceivedEvent): Promise<void> => {
           event.title || file.name || 'Shared file'
         );
       }
-      if (Toast) {
+      if (showToast && Toast) {
         await Toast.show({
           text: files.length === 1 ? 'File captured!' : `${files.length} files captured!`,
           duration: 'short'
@@ -120,7 +152,7 @@ const handleSharedText = async (event: ShareReceivedEvent): Promise<void> => {
 
     if (!sharedText) {
       console.warn('No text found in share event', event);
-      if (Toast) {
+      if (showToast && Toast) {
         await Toast.show({ text: 'Nothing to capture from share', duration: 'short' }).catch(() => {});
       }
       return;
@@ -128,7 +160,7 @@ const handleSharedText = async (event: ShareReceivedEvent): Promise<void> => {
 
     console.log('Creating note capture for', sharedText);
     await createNoteCapture(sharedText, event.title || undefined);
-    if (Toast) {
+    if (showToast && Toast) {
       await Toast.show({ text: 'Note captured!', duration: 'short' });
     }
     try {
@@ -138,9 +170,81 @@ const handleSharedText = async (event: ShareReceivedEvent): Promise<void> => {
     }
   } catch (error) {
     console.error('Error handling shared text', error);
-    if (Toast) {
+    if (showToast && Toast) {
       await Toast.show({ text: 'Failed to capture', duration: 'short' }).catch(() => {});
     }
+  }
+};
+
+export const processPendingShares = async (): Promise<void> => {
+  if (Capacitor.getPlatform() === 'web') {
+    return;
+  }
+
+  if (pendingSharesPromise) {
+    return pendingSharesPromise;
+  }
+
+  pendingSharesPromise = (async () => {
+    console.log(`${LOG_TAG} Checking pending_shares queue`);
+
+    let entries: Awaited<ReturnType<typeof Filesystem.readdir>>;
+    try {
+      entries = await Filesystem.readdir({
+        path: PENDING_SHARES_DIR,
+        directory: Directory.Data
+      });
+    } catch (error) {
+      console.log(`${LOG_TAG} No pending_shares directory yet`, error);
+      return;
+    }
+
+    const jsonFiles = entries.files
+      .filter((file) => file.type === 'file' && file.name.startsWith('share-') && file.name.endsWith('.json'))
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    console.log(`${LOG_TAG} Found ${jsonFiles.length} pending share file(s)`);
+
+    for (const file of jsonFiles) {
+      const filePath = `${PENDING_SHARES_DIR}/${file.name}`;
+
+      try {
+        const readResult = await Filesystem.readFile({
+          path: filePath,
+          directory: Directory.Data,
+          encoding: Encoding.UTF8
+        });
+
+        const raw = typeof readResult.data === 'string' ? readResult.data : '';
+        const payload = parsePendingSharePayload(raw);
+        if (!payload) {
+          console.warn(`${LOG_TAG} Skipping invalid pending share`, file.name);
+          continue;
+        }
+
+        const dedupKey = getShareDedupKey(payload);
+        if (isDuplicateShare(dedupKey)) {
+          console.log(`${LOG_TAG} Skipping duplicate pending share`, dedupKey);
+          await Filesystem.deleteFile({ path: filePath, directory: Directory.Data });
+          continue;
+        }
+
+        await handleSharedText(payload, { showToast: false });
+        await Filesystem.deleteFile({ path: filePath, directory: Directory.Data });
+        console.log(`${LOG_TAG} Processed pending share`, file.name);
+      } catch (error) {
+        console.error(`${LOG_TAG} Failed to process pending share`, file.name, error);
+      }
+    }
+  })().finally(() => {
+    pendingSharesPromise = null;
+  });
+
+  try {
+    await pendingSharesPromise;
+  } catch (error) {
+    pendingSharesPromise = null;
+    console.error(`${LOG_TAG} Pending share drain failed`, error);
   }
 };
 

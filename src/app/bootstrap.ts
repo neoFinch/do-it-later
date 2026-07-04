@@ -1,5 +1,5 @@
 import { initializeCaptureService } from '../services/capture.service';
-import { initializeShareService } from '../services/share.service';
+import { initializeShareService, processPendingShares } from '../services/share.service';
 import { processStaleCaptures } from '../services/processing.service';
 
 let bootstrapPromise: Promise<void> | null = null;
@@ -11,6 +11,12 @@ export const bootstrapApp = async (): Promise<void> => {
 
   bootstrapPromise = (async () => {
     await initializeCaptureService();
+
+    try {
+      await processPendingShares();
+    } catch (error) {
+      console.warn('Pending share processing failed', error);
+    }
 
     try {
       await initializeShareService();

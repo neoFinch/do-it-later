@@ -6,9 +6,13 @@ import { initializeCaptureProcessingTable } from '../database/processing.reposit
 import { fetchUrlMetadata } from './metadata.service';
 import { deletePersistedFile, isImageMime, persistSharedFile, SharedFileInput } from './file.service';
 import { cleanTitle, isDirtyShareTitle } from './title.service';
+import { canonicalizeCaptureUrl } from './link.service';
 import { useCaptureStore } from '../store/captureStore';
 import { deleteCaptureArtifacts, queueCaptureProcessing } from './processing.service';
 import { pickThumbnailUrl, resolveThumbnailForUrl } from './thumbnail.service';
+
+const INBOX_REFRESH_DEBOUNCE_MS = 300;
+let inboxRefreshTimer: ReturnType<typeof setTimeout> | null = null;
 
 export const initializeCaptureService = async (): Promise<void> => {
   await repository.initializeCaptureTable();
@@ -83,12 +87,24 @@ const shouldReplaceTitle = (existingTitle: string | null | undefined, url: strin
   return !normalized || normalized === url;
 };
 
-const refreshInboxIfInitialized = async (): Promise<void> => {
-  const { initialized, reload } = useCaptureStore.getState();
+const scheduleInboxRefresh = (): void => {
+  const { initialized } = useCaptureStore.getState();
   if (!initialized) {
     return;
   }
-  await reload();
+
+  if (inboxRefreshTimer) {
+    clearTimeout(inboxRefreshTimer);
+  }
+
+  inboxRefreshTimer = setTimeout(() => {
+    inboxRefreshTimer = null;
+    void useCaptureStore.getState().reload({ silent: true });
+  }, INBOX_REFRESH_DEBOUNCE_MS);
+};
+
+export const refreshInboxIfInitialized = (): void => {
+  scheduleInboxRefresh();
 };
 
 export const enrichUrlCapture = async (
@@ -118,7 +134,7 @@ export const enrichUrlCapture = async (
     }
 
     await updateCapture(id, updates);
-    await refreshInboxIfInitialized();
+    refreshInboxIfInitialized();
   } catch (error) {
     console.warn('Failed to enrich capture metadata', { id, url, error });
 
@@ -133,7 +149,7 @@ export const enrichUrlCapture = async (
     }
 
     await updateCapture(id, { thumbnail: fallbackThumbnail });
-    await refreshInboxIfInitialized();
+    refreshInboxIfInitialized();
   }
 };
 
@@ -174,34 +190,43 @@ export const refreshDirtyCaptureTitles = async (): Promise<void> => {
   );
 
   if (updated > 0) {
-    await refreshInboxIfInitialized();
+    refreshInboxIfInitialized();
   }
 };
 
 export const updateCaptureTitle = async (id: string, title: string): Promise<void> => {
   const trimmed = title.trim();
   await updateCapture(id, { title: trimmed ? trimmed : null });
-  await refreshInboxIfInitialized();
+  refreshInboxIfInitialized();
 };
 
 export const updateCaptureStatus = async (id: string, status: CaptureStatus): Promise<void> => {
   await updateCapture(id, { status });
-  await refreshInboxIfInitialized();
+  refreshInboxIfInitialized();
 };
 
 export const createUrlCapture = async (url: string, title?: string | null): Promise<string> => {
+  const canonicalUrl = canonicalizeCaptureUrl(url);
+  const existing = await repository.findUrlCaptureByUrl(canonicalUrl);
+  if (existing) {
+    if (!existing.thumbnail || isDirtyShareTitle(existing.title, existing.url ?? '')) {
+      queueUrlCaptureEnrichment(existing.id, existing.url!, existing.title);
+    }
+    return existing.id;
+  }
+
   const id = createId();
   await saveCapture({
     id,
     type: 'url',
-    url: normalizeValue(url),
-    title: normalizeValue(title?.trim() ? cleanTitle(title) : url),
+    url: normalizeValue(canonicalUrl),
+    title: normalizeValue(title?.trim() ? cleanTitle(title) : canonicalUrl),
     content: null,
     source: null,
     thumbnail: null,
     status: 'INBOX'
   });
-  queueUrlCaptureEnrichment(id, url, title ?? url);
+  queueUrlCaptureEnrichment(id, canonicalUrl, title ?? canonicalUrl);
   return id;
 };
 

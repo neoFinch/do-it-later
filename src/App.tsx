@@ -1,8 +1,12 @@
+import { useEffect } from 'react';
 import { Redirect, Route, Switch } from 'react-router-dom';
+import { App as CapApp } from '@capacitor/app';
+import { Capacitor } from '@capacitor/core';
 import {
   IonApp,
   setupIonicReact
 } from '@ionic/react';
+import { processPendingShares } from './services/share.service';
 import { IonReactRouter } from '@ionic/react-router';
 import InboxPage from './pages/InboxPage';
 import QuickAddPage from './pages/QuickAddPage';
@@ -38,6 +42,27 @@ console.log('App: setupIonicReact called');
 
 const App: React.FC = () => {
   console.log('App: render');
+
+  useEffect(() => {
+    if (Capacitor.getPlatform() === 'web') {
+      return;
+    }
+
+    let removeListener: (() => void) | undefined;
+
+    void CapApp.addListener('appStateChange', ({ isActive }) => {
+      if (isActive) {
+        void processPendingShares();
+      }
+    }).then((listener) => {
+      removeListener = () => listener.remove();
+    });
+
+    return () => {
+      removeListener?.();
+    };
+  }, []);
+
   return (
     <IonApp>
       <IonReactRouter>

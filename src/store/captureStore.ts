@@ -17,7 +17,7 @@ interface CaptureState {
   loading: boolean;
   initialized: boolean;
   init: () => Promise<void>;
-  reload: () => Promise<void>;
+  reload: (options?: { silent?: boolean }) => Promise<void>;
   setStatusFilter: (status: CaptureStatus) => Promise<void>;
   search: (query: string) => Promise<void>;
   addUrlCapture: (url: string, title?: string | null) => Promise<void>;
@@ -67,16 +67,23 @@ export const useCaptureStore = create<CaptureState>((set, get) => ({
       throw error;
     }
   },
-  reload: async () => {
-    console.log('CaptureStore: reload called');
-    set({ loading: true });
+  reload: async (options) => {
+    const silent = options?.silent === true;
+    if (!silent) {
+      console.log('CaptureStore: reload called');
+      set({ loading: true });
+    }
     try {
       const { statusFilter } = get();
       const { captures, statusCounts } = await loadCapturesAndCounts(statusFilter);
-      console.log('CaptureStore: reload finished, got', captures.length, 'captures');
+      if (!silent) {
+        console.log('CaptureStore: reload finished, got', captures.length, 'captures');
+      }
       set({ captures, statusCounts, loading: false, initialized: true });
-      captureService.enrichStaleUrlCaptures(captures);
-      void captureService.refreshDirtyCaptureTitles();
+      if (!silent) {
+        captureService.enrichStaleUrlCaptures(captures);
+        void captureService.refreshDirtyCaptureTitles();
+      }
     } catch (error) {
       console.error('CaptureStore: reload failed', error);
       set({ loading: false });

@@ -7,7 +7,7 @@ import {
   saveCaptureProcessing
 } from '../database/processing.repository';
 import { CaptureProcessing, PipelineStatus } from '../types/capture-processing';
-import { analyzeContent } from './ai/content-analysis.service';
+import { analyze } from './ai/content-analysis.service';
 import { isActiveProviderAvailable, shouldAutoAnalyze } from './ai/provider-registry';
 import { listCaptures } from './capture.service';
 import { extractCapture, getCaptureExtraction, processStaleExtractions } from './extraction.service';
@@ -93,7 +93,7 @@ export const analyzeCapture = async (captureId: string, options?: { force?: bool
 
     await setAnalysisStatus(captureId, 'processing', null);
     try {
-      const analysis = await analyzeContent(document);
+      const analysis = await analyze(document, { force });
       await saveAiAnalysis(analysis);
       await setAnalysisStatus(captureId, 'completed', null);
     } catch (error) {

@@ -13,6 +13,63 @@ export const normalizeUrl = (url: string): string => {
   return trimmed;
 };
 
+/** Query params ignored when detecting duplicate URL captures. */
+const TRACKING_QUERY_PARAMS = new Set([
+  'si',
+  'fbclid',
+  'gclid',
+  'igsh',
+  'igshid',
+  'ref',
+  'ref_src',
+  'ref_source',
+  's',
+  't',
+  'utm_source',
+  'utm_medium',
+  'utm_campaign',
+  'utm_term',
+  'utm_content',
+  'utm_id'
+]);
+
+const stripTrackingParams = (parsed: URL): void => {
+  for (const key of [...parsed.searchParams.keys()]) {
+    if (TRACKING_QUERY_PARAMS.has(key.toLowerCase()) || key.toLowerCase().startsWith('utm_')) {
+      parsed.searchParams.delete(key);
+    }
+  }
+};
+
+/** Canonical form used to detect duplicate URL captures. */
+export const canonicalizeCaptureUrl = (url: string): string => {
+  const normalized = normalizeUrl(url.trim());
+
+  try {
+    const parsed = new URL(normalized);
+    parsed.hostname = parsed.hostname.toLowerCase().replace(/^www\./, '');
+    parsed.hash = '';
+    if (parsed.pathname.length > 1 && parsed.pathname.endsWith('/')) {
+      parsed.pathname = parsed.pathname.slice(0, -1);
+    }
+
+    const videoId = extractYouTubeVideoId(parsed.toString());
+    if (videoId) {
+      return `https://youtube.com/watch?v=${videoId}`;
+    }
+
+    stripTrackingParams(parsed);
+    parsed.search = parsed.searchParams.toString();
+    if (parsed.search) {
+      parsed.search = `?${parsed.search}`;
+    }
+
+    return parsed.toString();
+  } catch {
+    return normalized.toLowerCase();
+  }
+};
+
 export const extractFirstUrl = (text: string): string | null => {
   const match = text.match(/https?:\/\/[^\s]+/i);
   return match ? match[0] : null;

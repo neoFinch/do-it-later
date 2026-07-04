@@ -1,10 +1,18 @@
 import { Capacitor } from '@capacitor/core';
-import { AIAnalysis, ContentType, Difficulty } from '../types/ai-analysis';
+import {
+  AIAnalysis,
+  ContentType,
+  Difficulty,
+  ExpectationLevel,
+  ImplementationLevel,
+  LearningStyle,
+  ViewerExpectation
+} from '../types/ai-analysis';
 import { parseJsonArray, stringifyJsonArray } from '../utils/json-field';
 import { getDatabase, initDatabase } from './sqlite';
 
 const isWeb = Capacitor.getPlatform() === 'web';
-const STORAGE_KEY = 'later:ai_analysis_v1';
+const STORAGE_KEY = 'later:ai_analysis_v3';
 
 const VALID_DIFFICULTIES: Difficulty[] = ['beginner', 'intermediate', 'advanced'];
 const VALID_CONTENT_TYPES: ContentType[] = [
@@ -15,6 +23,9 @@ const VALID_CONTENT_TYPES: ContentType[] = [
   'opinion',
   'other'
 ];
+const VALID_IMPLEMENTATION_LEVELS: ImplementationLevel[] = ['none', 'low', 'medium', 'high'];
+const VALID_LEARNING_STYLES: LearningStyle[] = ['conceptual', 'mixed', 'practical'];
+const VALID_EXPECTATION_LEVELS: ExpectationLevel[] = ['low', 'medium', 'high'];
 
 const normalizeDifficulty = (value: unknown): Difficulty => {
   if (typeof value === 'string' && VALID_DIFFICULTIES.includes(value as Difficulty)) {
@@ -30,10 +41,49 @@ const normalizeContentType = (value: unknown): ContentType => {
   return 'other';
 };
 
+const normalizeImplementationLevel = (value: unknown): ImplementationLevel => {
+  if (typeof value === 'string' && VALID_IMPLEMENTATION_LEVELS.includes(value as ImplementationLevel)) {
+    return value as ImplementationLevel;
+  }
+  return 'none';
+};
+
+const normalizeLearningStyle = (value: unknown): LearningStyle => {
+  if (typeof value === 'string' && VALID_LEARNING_STYLES.includes(value as LearningStyle)) {
+    return value as LearningStyle;
+  }
+  return 'conceptual';
+};
+
+const normalizeExpectationLevel = (value: unknown): ExpectationLevel => {
+  if (typeof value === 'string' && VALID_EXPECTATION_LEVELS.includes(value as ExpectationLevel)) {
+    return value as ExpectationLevel;
+  }
+  return 'medium';
+};
+
+const normalizeViewerExpectation = (value: unknown): ViewerExpectation => {
+  if (typeof value === 'object' && value) {
+    const record = value as Record<string, unknown>;
+    return {
+      youWillLearn: parseJsonArray(record.youWillLearn),
+      youWillNotLearn: parseJsonArray(record.youWillNotLearn)
+    };
+  }
+  return { youWillLearn: [], youWillNotLearn: [] };
+};
+
+const normalizeStoredAnalysis = (item: AIAnalysis): AIAnalysis => ({
+  ...item,
+  expectedLearning: item.expectedLearning ?? 'medium',
+  potentialDisappointment: item.potentialDisappointment ?? 'medium',
+  recommendation: item.recommendation ?? item.summary ?? ''
+});
+
 const readStorage = (): AIAnalysis[] => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY) ?? '[]';
-    return JSON.parse(raw) as AIAnalysis[];
+    return (JSON.parse(raw) as AIAnalysis[]).map(normalizeStoredAnalysis);
   } catch {
     return [];
   }
@@ -49,8 +99,16 @@ const mapRow = (row: Record<string, unknown>): AIAnalysis => ({
   difficulty: normalizeDifficulty(row.difficulty),
   targetAudience: parseJsonArray(row.targetAudience),
   contentType: normalizeContentType(row.contentType),
-  containsCode: Boolean(row.containsCode),
-  containsHandsOn: Boolean(row.containsHandsOn),
+  implementationLevel: normalizeImplementationLevel(row.implementationLevel),
+  learningStyle: normalizeLearningStyle(row.learningStyle),
+  codeWalkthrough: Boolean(row.codeWalkthrough),
+  viewerExpectation: {
+    youWillLearn: parseJsonArray(row.viewerExpectationYouWillLearn),
+    youWillNotLearn: parseJsonArray(row.viewerExpectationYouWillNotLearn)
+  },
+  expectedLearning: normalizeExpectationLevel(row.expectedLearning),
+  potentialDisappointment: normalizeExpectationLevel(row.potentialDisappointment),
+  recommendation: String(row.recommendation ?? row.summary ?? ''),
   estimatedReadingTime: row.estimatedReadingTime != null ? Number(row.estimatedReadingTime) : null,
   estimatedWatchTime: row.estimatedWatchTime != null ? Number(row.estimatedWatchTime) : null,
   prerequisites: parseJsonArray(row.prerequisites),
@@ -95,18 +153,26 @@ export const saveAiAnalysis = async (analysis: AIAnalysis): Promise<void> => {
   const db = await getDatabase();
   await db.run(
     `INSERT OR REPLACE INTO ai_analysis
-      (captureId, topics, difficulty, targetAudience, contentType, containsCode, containsHandsOn,
+      (captureId, topics, difficulty, targetAudience, contentType, implementationLevel, learningStyle,
+       codeWalkthrough, viewerExpectationYouWillLearn, viewerExpectationYouWillNotLearn,
+       expectedLearning, potentialDisappointment, recommendation,
        estimatedReadingTime, estimatedWatchTime, prerequisites, learningOutcomes, summary,
        keyTakeaways, reasoning, confidence, analyzedAt)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
     [
       analysis.captureId,
       stringifyJsonArray(analysis.topics),
       analysis.difficulty,
       stringifyJsonArray(analysis.targetAudience),
       analysis.contentType,
-      analysis.containsCode ? 1 : 0,
-      analysis.containsHandsOn ? 1 : 0,
+      analysis.implementationLevel,
+      analysis.learningStyle,
+      analysis.codeWalkthrough ? 1 : 0,
+      stringifyJsonArray(analysis.viewerExpectation.youWillLearn),
+      stringifyJsonArray(analysis.viewerExpectation.youWillNotLearn),
+      analysis.expectedLearning,
+      analysis.potentialDisappointment,
+      analysis.recommendation,
       analysis.estimatedReadingTime,
       analysis.estimatedWatchTime,
       stringifyJsonArray(analysis.prerequisites),

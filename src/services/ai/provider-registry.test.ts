@@ -7,11 +7,11 @@ describe('provider-registry', () => {
     localStorage.clear();
   });
 
-  it('lists implemented and stub providers', () => {
+  it('lists available providers', () => {
     const ids = listProviders().map((provider) => provider.id);
     expect(ids).toContain('openai');
     expect(ids).toContain('ollama');
-    expect(ids).toContain('gemini');
+    expect(ids).not.toContain('gemini');
   });
 
   it('returns null provider when openai is not configured', () => {

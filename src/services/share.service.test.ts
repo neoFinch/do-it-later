@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { extractSharedText } from './share.service';
+import { extractSharedText, parsePendingSharePayload } from './share.service';
 
 describe('share.service', () => {
   it('prefers shared texts over title', () => {
@@ -20,5 +20,21 @@ describe('share.service', () => {
     });
 
     expect(text).toBe('https://instagram.com/reel/abc123');
+  });
+
+  it('parses pending share json written by android trampoline', () => {
+    const payload = parsePendingSharePayload(
+      JSON.stringify({
+        title: 'Instagram',
+        texts: ['https://instagram.com/reel/abc123'],
+        files: []
+      })
+    );
+
+    expect(payload).toEqual({
+      title: 'Instagram',
+      texts: ['https://instagram.com/reel/abc123'],
+      files: []
+    });
   });
 });
