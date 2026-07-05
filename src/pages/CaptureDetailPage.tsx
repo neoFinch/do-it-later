@@ -6,9 +6,9 @@ import {
   IonContent,
   IonHeader,
   IonIcon,
-  IonInput,
   IonPage,
   IonSpinner,
+  IonTextarea,
   IonTitle,
   IonToolbar,
   IonToast
@@ -17,17 +17,6 @@ import {
   archiveOutline,
   arrowUndoOutline,
   checkmarkCircleOutline,
-  colorWandOutline,
-  documentOutline,
-  documentTextOutline,
-  imageOutline,
-  linkOutline,
-  logoInstagram,
-  logoLinkedin,
-  logoReddit,
-  logoTiktok,
-  logoX,
-  logoYoutube,
   openOutline,
   trashOutline
 } from 'ionicons/icons';
@@ -38,9 +27,10 @@ import { Capture, CaptureStatus } from '../types/capture';
 import { useCapturePreview } from '../hooks/useCapturePreview';
 import { isImageMime, isImagePath, isLegacyLocalFilePath } from '../services/file.service';
 import { getCaptureLink, getOpenLinkLabel, openLink } from '../services/link.service';
-import { getCaptureDisplayTitle, suggestTitle, titlesAreEquivalent } from '../services/title.service';
-import { getCaptureSourceBadge, SourceBadgeVariant } from '../utils/capture-source';
+import { getCaptureDisplayTitle, titlesAreEquivalent } from '../services/title.service';
+import { getCaptureSourceBadge } from '../utils/capture-source';
 import { formatRelativeSavedAt } from '../utils/format-date';
+import { getContentConsumeLabel } from '../utils/content-duration';
 import { getCaptureUnderstanding, analyzeCapture } from '../services/processing.service';
 import { extractCapture } from '../services/extraction.service';
 import { AIAnalysis } from '../types/ai-analysis';
@@ -48,20 +38,8 @@ import { CaptureProcessing } from '../types/capture-processing';
 import { ContentDocument } from '../types/content-document';
 import CaptureExtractedContent from '../components/CaptureExtractedContent';
 import AttentionScorecard from '../components/AttentionScorecard';
+import CaptureLearningExpectations from '../components/CaptureLearningExpectations';
 import './CaptureDetailPage.css';
-
-const SOURCE_ICONS: Record<SourceBadgeVariant, string> = {
-  youtube: logoYoutube,
-  instagram: logoInstagram,
-  tiktok: logoTiktok,
-  twitter: logoX,
-  reddit: logoReddit,
-  linkedin: logoLinkedin,
-  generic: linkOutline,
-  note: documentTextOutline,
-  image: imageOutline,
-  file: documentOutline
-};
 
 const STATUS_LABELS: Record<CaptureStatus, string> = {
   INBOX: 'Inbox',
@@ -198,16 +176,6 @@ const CaptureDetailPage: React.FC = () => {
     }
   };
 
-  const handleCleanTitle = () => {
-    const source = titleDraft || capture?.title || capture?.content || '';
-    const cleaned = suggestTitle(source);
-    if (!cleaned) {
-      setToastMessage('Nothing to clean up.');
-      return;
-    }
-    setTitleDraft(cleaned);
-  };
-
   const handleStatusChange = async (status: CaptureStatus, message: string) => {
     if (!capture) {
       return;
@@ -267,7 +235,7 @@ const CaptureDetailPage: React.FC = () => {
             <IonButtons slot="start">
               <IonBackButton defaultHref="/" />
             </IonButtons>
-            <IonTitle>Capture</IonTitle>
+            <IonTitle>Details</IonTitle>
           </IonToolbar>
         </IonHeader>
         <IonContent fullscreen className="ion-padding">
@@ -286,7 +254,13 @@ const CaptureDetailPage: React.FC = () => {
   const showLegacyPath =
     capture.type === 'note' && !!capture.content && isLegacyLocalFilePath(capture.content);
   const titleChanged = !titlesAreEquivalent(titleDraft, capture.title);
-  const statusClass = capture.status.toLowerCase();
+  const consumeLabel = document ? getContentConsumeLabel(document) : null;
+  const metaParts = [
+    badge.label,
+    STATUS_LABELS[capture.status],
+    formatRelativeSavedAt(capture.createdAt),
+    consumeLabel
+  ].filter(Boolean);
 
   return (
     <IonPage>
@@ -295,7 +269,7 @@ const CaptureDetailPage: React.FC = () => {
           <IonButtons slot="start">
             <IonBackButton defaultHref="/" />
           </IonButtons>
-          <IonTitle>Capture</IonTitle>
+          <IonTitle>Details</IonTitle>
           <IonButtons slot="end">
             <IonButton color="danger" aria-label="Delete capture" onClick={deleteItem}>
               <IonIcon icon={trashOutline} slot="icon-only" />
@@ -315,36 +289,26 @@ const CaptureDetailPage: React.FC = () => {
           )} */}
 
           <div className="capture-detail__meta">
-            <span
-              className={`capture-detail__badge capture-detail__badge--${badge.variant}`}
-              aria-label={badge.label}
-              title={badge.label}
-            >
-              <IonIcon icon={SOURCE_ICONS[badge.variant]} aria-hidden="true" />
-            </span>
-            <span className={`capture-detail__status capture-detail__status--${statusClass}`}>
-              {STATUS_LABELS[capture.status]}
-            </span>
-            <span className="capture-detail__date">{formatRelativeSavedAt(capture.createdAt)}</span>
+            <span className="capture-detail__meta-text">{metaParts.join(' · ')}</span>
           </div>
 
-          <section className="capture-detail__section">
-            <h2 className="capture-detail__label">Title</h2>
-            <IonInput
+          <div className="capture-detail__title-block">
+            <IonTextarea
               className="capture-detail__title-input"
               value={titleDraft}
+              autoGrow
+              rows={1}
               placeholder="Add a title"
               onIonInput={(event) => setTitleDraft(event.detail.value ?? '')}
             />
-            <div className="capture-detail__title-actions">
-              <IonButton fill="outline" color="tertiary" aria-label="Clean up title" onClick={handleCleanTitle}>
-                <IonIcon icon={colorWandOutline} slot="icon-only" />
-              </IonButton>
-              <IonButton expand="block" color="primary" disabled={!titleChanged} onClick={handleSaveTitle}>
-                Save title
-              </IonButton>
-            </div>
-          </section>
+            {titleChanged && (
+              <div className="capture-detail__title-actions">
+                <IonButton size="small" color="primary" onClick={handleSaveTitle}>
+                  Save
+                </IonButton>
+              </div>
+            )}
+          </div>
 
           {showUnderstanding && (
             <>
@@ -360,6 +324,12 @@ const CaptureDetailPage: React.FC = () => {
                 busy={analysisBusy}
                 onAnalyze={handleAnalyze}
               />
+              {analysis && (
+                <CaptureLearningExpectations
+                  youWillLearn={analysis.viewerExpectation.youWillLearn}
+                  youWillNotLearn={analysis.viewerExpectation.youWillNotLearn}
+                />
+              )}
             </>
           )}
 

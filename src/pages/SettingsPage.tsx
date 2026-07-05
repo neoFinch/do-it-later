@@ -19,7 +19,7 @@ import {
   IonToolbar
 } from '@ionic/react';
 import { Capacitor } from '@capacitor/core';
-import { downloadOutline, cloudUploadOutline } from 'ionicons/icons';
+import { downloadOutline, cloudUploadOutline, moonOutline, sunnyOutline } from 'ionicons/icons';
 import {
   exportCaptures,
   importCaptures,
@@ -34,6 +34,7 @@ import { ProviderId } from '../services/ai/ai-provider.types';
 import { seedMockCaptures } from '../services/seed.service';
 import { processStaleCaptures } from '../services/processing.service';
 import { useCaptureStore } from '../store/captureStore';
+import { getActiveTheme, saveTheme, ThemePreference } from '../services/theme.service';
 
 const SettingsPage: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -44,6 +45,7 @@ const SettingsPage: React.FC = () => {
   const [model, setModel] = useState(() => getAiConfig().model);
   const [baseUrl, setBaseUrl] = useState(() => getAiConfig().baseUrl);
   const [autoAnalyze, setAutoAnalyze] = useState(() => getAiConfig().autoAnalyze);
+  const [theme, setTheme] = useState<ThemePreference>(() => getActiveTheme());
   const { reload, repairDatabase } = useCaptureStore();
   const providers = listProviders();
 
@@ -178,6 +180,11 @@ const SettingsPage: React.FC = () => {
     setToastMessage('API key cleared.');
   };
 
+  const handleThemeChange = (next: ThemePreference) => {
+    saveTheme(next);
+    setTheme(next);
+  };
+
   return (
     <IonPage>
       <IonHeader>
@@ -190,7 +197,34 @@ const SettingsPage: React.FC = () => {
       </IonHeader>
       <IonContent fullscreen className="ion-padding">
         <IonText color="medium">
-          <h2>AI understanding</h2>
+          <h2>Appearance</h2>
+          <p>Choose light or dark theme. Your choice is saved on this device.</p>
+        </IonText>
+        <div className="settings-theme-toggle ion-margin-top">
+          <IonButton
+            fill={theme === 'light' ? 'solid' : 'outline'}
+            color={theme === 'light' ? 'primary' : 'medium'}
+            aria-label="Light theme"
+            aria-pressed={theme === 'light'}
+            onClick={() => handleThemeChange('light')}
+          >
+            <IonIcon icon={sunnyOutline} slot="start" />
+            Light
+          </IonButton>
+          <IonButton
+            fill={theme === 'dark' ? 'solid' : 'outline'}
+            color={theme === 'dark' ? 'primary' : 'medium'}
+            aria-label="Dark theme"
+            aria-pressed={theme === 'dark'}
+            onClick={() => handleThemeChange('dark')}
+          >
+            <IonIcon icon={moonOutline} slot="start" />
+            Dark
+          </IonButton>
+        </div>
+
+        <IonText color="medium">
+          <h2 className="ion-margin-top">AI understanding</h2>
           <p>
             V2.0 extracts article text or YouTube transcripts, then analyzes content through a
             pluggable AI provider to produce structured metadata on each capture.

@@ -12,3 +12,114 @@ ion-content {
     max(var(--ion-safe-area-bottom, 0px), var(--app-android-nav-height)) + var(--app-content-bottom-inset)
   );
 }
+
+/* ——— App chrome ——— */
+
+ion-toolbar {
+  --border-color: var(--app-border-subtle);
+}
+
+ion-toolbar ion-title {
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+ion-searchbar {
+  --background: var(--ion-background-color);
+  --border-radius: 12px;
+  --box-shadow: none;
+  --icon-color: var(--ion-color-medium);
+  --placeholder-color: var(--ion-color-medium);
+  box-shadow: none;
+  filter: none;
+}
+
+ion-list {
+  --ion-item-background: var(--ion-background-color);
+  background: var(--ion-background-color);
+}
+
+.inbox-status-segment ion-segment-button {
+  --indicator-color: var(--ion-color-primary);
+  --color-checked: var(--ion-color-primary);
+}
+
+.inbox-status-segment ion-segment-button::part(indicator-background) {
+  background: rgba(var(--ion-color-primary-rgb), 0.14);
+  border-radius: 10px;
+}
+
+.inbox-status-tab__count {
+  color: var(--ion-color-medium);
+}
+
+ion-segment-button.segment-button-checked .inbox-status-tab__count {
+  color: var(--ion-color-primary);
+}
+
+/* ——— Surfaces & cards ——— */
+
+.capture-grid__item {
+  background: var(--app-surface);
+  border-radius: 12px;
+  overflow: hidden;
+  text-align: left;
+  cursor: pointer;
+  border: 1px solid var(--app-border-subtle);
+  box-shadow: none;
+}
+
+.capture-list-item__media,
+.capture-grid__media,
+.capture-detail__hero {
+  background: var(--ion-color-step-150);
+}
+
+.attention-scorecard__panel {
+  background: var(--app-surface-raised);
+  border: 1px solid var(--app-border-subtle);
+}
+
+.attention-scorecard__details-toggle,
+.attention-scorecard__details {
+  border-color: var(--app-border-subtle);
+}
+
+.attention-scorecard__metric {
+  border-color: var(--app-border-subtle);
+}
+
+.attention-scorecard__stars {
+  color: var(--ion-color-primary);
+}
+
+.capture-detail__label {
+  color: rgba(var(--ion-color-secondary-rgb), 0.85);
+}
+
+.attention-scorecard__title {
+  color: var(--ion-text-color);
+}
+
+/* ——— Primary actions ——— */
+
+ion-button[color='primary'] {
+  --background: var(--ion-color-primary);
+  --background-activated: var(--ion-color-primary-shade);
+  --color: var(--ion-color-primary-contrast);
+}
+
+ion-button[color='tertiary'] {
+  --background: rgba(var(--ion-color-secondary-rgb), 0.16);
+  --color: var(--ion-color-secondary);
+}
+
+.settings-theme-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.settings-theme-toggle ion-button {
+  margin: 0;
+}

@@ -38,6 +38,8 @@
 .inbox-search-row__search {
   flex: 1;
   padding-inline-start: 0;
+  --box-shadow: none;
+  --background: var(--ion-background-color);
 }
 
 .inbox-search-row__action {
@@ -62,12 +64,6 @@
   margin: 0;
   padding: 0;
   border: none;
-  background: var(--ion-item-background, var(--ion-background-color));
-  border-radius: 12px;
-  overflow: hidden;
-  text-align: left;
-  cursor: pointer;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
 }
 
 .capture-grid__media {

@@ -1,6 +1,6 @@
+import { useMemo, useState } from 'react';
 import { IonButton, IonIcon, IonSpinner, IonText } from '@ionic/react';
-import { alertCircleOutline, refreshOutline } from 'ionicons/icons';
-import { useMemo } from 'react';
+import { alertCircleOutline, chevronDownOutline, chevronUpOutline, refreshOutline } from 'ionicons/icons';
 import { buildAttentionScorecard, renderStars } from '../services/ai/attention-scorecard.service';
 import { AIAnalysis } from '../types/ai-analysis';
 import { CaptureProcessing } from '../types/capture-processing';
@@ -34,7 +34,7 @@ const analysisStatusMessage = (processing: CaptureProcessing | null, analysis: A
   }
 
   if (processing.analysisStatus === 'pending') {
-    return 'Ready for attention scorecard';
+    return 'Ready for analysis';
   }
 
   return 'No scorecard yet';
@@ -42,12 +42,12 @@ const analysisStatusMessage = (processing: CaptureProcessing | null, analysis: A
 
 const recommendationClassName = (label: string): string => {
   if (label === 'Read Now') {
-    return 'attention-scorecard__recommendation attention-scorecard__recommendation--now';
+    return 'attention-scorecard__verdict attention-scorecard__verdict--now';
   }
   if (label === 'Skip') {
-    return 'attention-scorecard__recommendation attention-scorecard__recommendation--skip';
+    return 'attention-scorecard__verdict attention-scorecard__verdict--skip';
   }
-  return 'attention-scorecard__recommendation attention-scorecard__recommendation--later';
+  return 'attention-scorecard__verdict attention-scorecard__verdict--later';
 };
 
 const AttentionScorecard: React.FC<AttentionScorecardProps> = ({
@@ -56,18 +56,25 @@ const AttentionScorecard: React.FC<AttentionScorecardProps> = ({
   busy,
   onAnalyze
 }) => {
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const scorecard = useMemo(() => (analysis ? buildAttentionScorecard(analysis) : null), [analysis]);
+
+  const analyzeLabel = scorecard ? 'Re-analyze' : 'Analyze';
 
   return (
     <section className="capture-detail__section attention-scorecard">
       <div className="attention-scorecard__header">
-        <h2 className="capture-detail__label">Attention Scorecard</h2>
-        {!analysis && (
-          <IonButton fill="clear" size="small" disabled={busy} onClick={onAnalyze}>
-            {busy ? <IonSpinner name="crescent" /> : <IonIcon icon={refreshOutline} slot="start" />}
-            {busy ? 'Working…' : 'Analyze'}
-          </IonButton>
-        )}
+        <h2 className="capture-detail__label attention-scorecard__title">Worth your time?</h2>
+        <IonButton
+          fill="clear"
+          size="small"
+          color="medium"
+          disabled={busy}
+          aria-label={analyzeLabel}
+          onClick={onAnalyze}
+        >
+          {busy ? <IonSpinner name="crescent" /> : <IonIcon icon={refreshOutline} slot="icon-only" />}
+        </IonButton>
       </div>
 
       {!scorecard ? (
@@ -78,87 +85,70 @@ const AttentionScorecard: React.FC<AttentionScorecardProps> = ({
           </IonText>
         </div>
       ) : (
-        <>
-          <div className="attention-scorecard__panel">
-            <div className="attention-scorecard__hero">
-              <p className="attention-scorecard__label">Worth Your Time</p>
-              <p className="attention-scorecard__stars" aria-label={`${scorecard.worthYourTimeStars} out of 5 stars`}>
-                {renderStars(scorecard.worthYourTimeStars)}
-              </p>
-              <p className={recommendationClassName(scorecard.recommendationLabel)}>
-                {scorecard.recommendationLabel}
-              </p>
-            </div>
-
-            <div className="attention-scorecard__grid">
-              <div className="attention-scorecard__metric">
-                <p className="attention-scorecard__label">Confidence</p>
-                <p className="attention-scorecard__value">{scorecard.confidencePercent}%</p>
-              </div>
-              <div className="attention-scorecard__metric">
-                <p className="attention-scorecard__label">Time</p>
-                <p className="attention-scorecard__value">
-                  {scorecard.estimatedTimeMinutes ? `${scorecard.estimatedTimeMinutes} min` : 'Unknown'}
-                </p>
-              </div>
-              <div className="attention-scorecard__metric">
-                <p className="attention-scorecard__label">Learning Style</p>
-                <p className="attention-scorecard__value">{scorecard.learningStyleLabel}</p>
-              </div>
-              <div className="attention-scorecard__metric">
-                <p className="attention-scorecard__label">Implementation</p>
-                <p className="attention-scorecard__value">{scorecard.implementationLevelLabel}</p>
-              </div>
-              <div className="attention-scorecard__metric">
-                <p className="attention-scorecard__label">Expected Learning</p>
-                <p
-                  className="attention-scorecard__stars attention-scorecard__stars--compact"
-                  aria-label={`${scorecard.expectedLearningStars} out of 5 stars`}
-                >
-                  {renderStars(scorecard.expectedLearningStars)}
-                </p>
-              </div>
-              <div className="attention-scorecard__metric">
-                <p className="attention-scorecard__label">Potential Disappointment</p>
-                <p className="attention-scorecard__value">{scorecard.potentialDisappointmentLabel}</p>
-              </div>
-            </div>
+        <div className="attention-scorecard__panel">
+          <div className="attention-scorecard__hero">
+            <p className="attention-scorecard__stars" aria-label={`${scorecard.worthYourTimeStars} out of 5 stars`}>
+              {renderStars(scorecard.worthYourTimeStars)}
+            </p>
+            <p className={recommendationClassName(scorecard.recommendationLabel)}>{scorecard.recommendationLabel}</p>
+            {scorecard.recommendationText && (
+              <p className="attention-scorecard__summary">{scorecard.recommendationText}</p>
+            )}
+            {scorecard.confidencePercent < 60 && (
+              <p className="attention-scorecard__confidence-note">Based on limited extracted content.</p>
+            )}
           </div>
 
-          {scorecard.youWillLearn.length > 0 && (
-            <div className="attention-scorecard__section">
-              <h3>You&apos;ll Learn</h3>
-              <ul className="attention-scorecard__list attention-scorecard__list--positive">
-                {scorecard.youWillLearn.map((item: string) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {scorecard.youWillNotLearn.length > 0 && (
-            <div className="attention-scorecard__section">
-              <h3>You Won&apos;t Learn</h3>
-              <ul className="attention-scorecard__list attention-scorecard__list--negative">
-                {scorecard.youWillNotLearn.map((item: string) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {scorecard.recommendationText && (
-            <div className="attention-scorecard__section">
-              <h3>Recommendation</h3>
-              <p className="attention-scorecard__recommendation-text">{scorecard.recommendationText}</p>
-            </div>
-          )}
-
-          <IonButton expand="block" fill="outline" color="medium" disabled={busy} onClick={onAnalyze}>
-            <IonIcon icon={refreshOutline} slot="start" />
-            Re-analyze
+          <IonButton
+            fill="clear"
+            size="small"
+            color="medium"
+            className="attention-scorecard__details-toggle"
+            aria-expanded={detailsOpen}
+            onClick={() => setDetailsOpen((open) => !open)}
+          >
+            {detailsOpen ? 'Hide details' : 'More details'}
+            <IonIcon icon={detailsOpen ? chevronUpOutline : chevronDownOutline} slot="end" />
           </IonButton>
-        </>
+
+          {detailsOpen && (
+            <div className="attention-scorecard__details">
+              <div className="attention-scorecard__grid">
+                <div className="attention-scorecard__metric">
+                  <p className="attention-scorecard__metric-label">Confidence</p>
+                  <p className="attention-scorecard__value">{scorecard.confidencePercent}%</p>
+                </div>
+                <div className="attention-scorecard__metric">
+                  <p className="attention-scorecard__metric-label">Time</p>
+                  <p className="attention-scorecard__value">
+                    {scorecard.estimatedTimeMinutes ? `${scorecard.estimatedTimeMinutes} min` : 'Unknown'}
+                  </p>
+                </div>
+                <div className="attention-scorecard__metric">
+                  <p className="attention-scorecard__metric-label">Learning style</p>
+                  <p className="attention-scorecard__value">{scorecard.learningStyleLabel}</p>
+                </div>
+                <div className="attention-scorecard__metric">
+                  <p className="attention-scorecard__metric-label">Implementation</p>
+                  <p className="attention-scorecard__value">{scorecard.implementationLevelLabel}</p>
+                </div>
+                <div className="attention-scorecard__metric">
+                  <p className="attention-scorecard__metric-label">Expected learning</p>
+                  <p
+                    className="attention-scorecard__stars attention-scorecard__stars--compact"
+                    aria-label={`${scorecard.expectedLearningStars} out of 5 stars`}
+                  >
+                    {renderStars(scorecard.expectedLearningStars)}
+                  </p>
+                </div>
+                <div className="attention-scorecard__metric">
+                  <p className="attention-scorecard__metric-label">Disappointment risk</p>
+                  <p className="attention-scorecard__value">{scorecard.potentialDisappointmentLabel}</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
       {processing?.analysisStatus === 'failed' && !analysis && (

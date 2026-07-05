@@ -207,7 +207,7 @@ const InboxPage: React.FC = () => {
         ) : viewMode === 'grid' ? (
           <CaptureGrid captures={captures} onSelect={openCapture} />
         ) : (
-          <IonList lines="full">
+          <IonList lines="none">
             {captures.map((capture) => (
               <CaptureListItem key={capture.id} capture={capture} onSelect={openCapture} />
             ))}
