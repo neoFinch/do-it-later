@@ -9,7 +9,7 @@
 
 .capture-detail__hero {
   position: relative;
-  border-radius: 14px;
+  border-radius: 20px;
   overflow: hidden;
   background: var(--ion-color-step-150, #2a2a2a);
 }
@@ -49,7 +49,7 @@
 }
 
 .capture-detail__meta-text {
-  font-size: 0.8rem;
+  font-size: var(--app-font-size-sm);
   color: var(--ion-color-medium);
 }
 
@@ -64,8 +64,7 @@
   --padding-end: 0;
   --padding-top: 0;
   --padding-bottom: 0;
-  font-size: 1.1rem;
-  font-weight: 600;
+  font-size: var(--app-font-size-xl);
   line-height: 1.4;
 }
 
@@ -87,7 +86,7 @@
 
 .capture-detail__label {
   margin: 0;
-  font-size: 0.72rem;
+  font-size: var(--app-font-size-xs);
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -102,7 +101,7 @@
 
 .capture-detail__note {
   margin: 0;
-  font-size: 0.95rem;
+  font-size: var(--app-font-size-md);
   line-height: 1.5;
   white-space: pre-wrap;
   color: var(--ion-text-color);
@@ -110,7 +109,7 @@
 
 .capture-detail__url {
   margin: 0;
-  font-size: 0.85rem;
+  font-size: var(--app-font-size-md);
   line-height: 1.4;
   color: var(--ion-color-primary);
   word-break: break-all;
@@ -127,7 +126,7 @@
 
 .capture-detail__file-info {
   margin: 0;
-  font-size: 0.85rem;
+  font-size: var(--app-font-size-sm);
   color: var(--ion-color-medium);
 }
 
@@ -150,12 +149,12 @@
 
 .capture-understanding__pending p {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: var(--app-font-size-md);
 }
 
 .capture-understanding__summary {
   margin: 0;
-  font-size: 0.98rem;
+  font-size: var(--app-font-size-md);
   line-height: 1.55;
 }
 
@@ -168,7 +167,7 @@
 
 .capture-understanding__group h3 {
   margin: 0 0 0.35rem;
-  font-size: 0.72rem;
+  font-size: var(--app-font-size-xs);
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -177,7 +176,7 @@
 
 .capture-understanding__group p {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: var(--app-font-size-md);
   line-height: 1.45;
   color: var(--ion-text-color);
 }
@@ -187,7 +186,7 @@
   align-items: center;
   gap: 0.35rem;
   margin: 0;
-  font-size: 0.85rem;
+  font-size: var(--app-font-size-sm);
 }
 
 .attention-scorecard__header {
@@ -204,8 +203,7 @@
 .attention-scorecard__title {
   text-transform: none;
   letter-spacing: normal;
-  font-size: 0.85rem;
-  font-weight: 600;
+  font-size: var(--app-font-size-md);
   color: var(--ion-text-color);
 }
 
@@ -217,11 +215,11 @@
 
 .attention-scorecard__pending p {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: var(--app-font-size-md);
 }
 
 .attention-scorecard__panel {
-  border-radius: 12px;
+  border-radius: 16px;
   overflow: hidden;
 }
 
@@ -232,14 +230,14 @@
 
 .attention-scorecard__metric-label {
   margin: 0;
-  font-size: 0.72rem;
+  font-size: var(--app-font-size-xs);
   font-weight: 600;
   color: var(--ion-color-medium);
 }
 
 .attention-scorecard__label {
   margin: 0;
-  font-size: 0.72rem;
+  font-size: var(--app-font-size-xs);
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -259,8 +257,7 @@
 
 .attention-scorecard__verdict {
   margin: 0 0 0.5rem;
-  font-size: 1.05rem;
-  font-weight: 700;
+  font-size: var(--app-font-size-xl);
 }
 
 .attention-scorecard__verdict--now {
@@ -277,7 +274,7 @@
 
 .attention-scorecard__summary {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: var(--app-font-size-md);
   line-height: 1.5;
   color: var(--ion-color-medium);
   text-align: left;
@@ -285,7 +282,7 @@
 
 .attention-scorecard__confidence-note {
   margin: 0.75rem 0 0;
-  font-size: 0.78rem;
+  font-size: var(--app-font-size-sm);
   color: var(--ion-color-medium);
   font-style: italic;
 }
@@ -295,7 +292,7 @@
   margin: 0;
   --padding-start: 1rem;
   --padding-end: 1rem;
-  font-size: 0.82rem;
+  font-size: var(--app-font-size-md);
   border-top: 1px solid var(--app-border-subtle);
 }
 
@@ -319,7 +316,7 @@
 
 .attention-scorecard__value {
   margin: 0.2rem 0 0;
-  font-size: 0.95rem;
+  font-size: var(--app-font-size-md);
   font-weight: 600;
   color: var(--ion-text-color);
 }
@@ -329,7 +326,7 @@
   align-items: center;
   gap: 0.35rem;
   margin: 0;
-  font-size: 0.85rem;
+  font-size: var(--app-font-size-sm);
 }
 
 .capture-learning__block + .capture-learning__block {
@@ -338,7 +335,7 @@
 
 .capture-learning__heading {
   margin: 0 0 0.5rem;
-  font-size: 0.78rem;
+  font-size: var(--app-font-size-sm);
   font-weight: 600;
   color: var(--ion-color-medium);
 }
@@ -352,7 +349,7 @@
 .capture-learning__list li {
   position: relative;
   padding: 0.35rem 0 0.35rem 1.35rem;
-  font-size: 0.92rem;
+  font-size: var(--app-font-size-md);
   line-height: 1.45;
 }
 
@@ -391,12 +388,12 @@
 
 .capture-extracted__pending p {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: var(--app-font-size-md);
 }
 
 .capture-extracted__preview {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: var(--app-font-size-md);
   line-height: 1.5;
   white-space: pre-wrap;
   color: var(--ion-text-color);
@@ -407,5 +404,5 @@
   align-items: center;
   gap: 0.35rem;
   margin: 0;
-  font-size: 0.85rem;
+  font-size: var(--app-font-size-sm);
 }

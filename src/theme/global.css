@@ -3,6 +3,30 @@
   --app-android-nav-height: 48px;
 }
 
+html,
+body,
+ion-app,
+ion-content,
+ion-item,
+ion-label,
+ion-button,
+ion-title {
+  font-family: var(--ion-font-family);
+  font-size: var(--app-font-size-md);
+}
+
+/* Titles stay on Jakarta; keep weight lighter than Ionic defaults */
+ion-toolbar ion-title,
+ion-toolbar ion-title .toolbar-title,
+.capture-list-item__title,
+.capture-grid__title,
+.capture-detail__title-input,
+.attention-scorecard__title,
+.attention-scorecard__verdict {
+  font-family: var(--app-font-title);
+  font-weight: 500;
+}
+
 ion-content {
   --padding-bottom: calc(var(--ion-safe-area-bottom, 0px) + var(--app-content-bottom-inset));
 }
@@ -20,16 +44,26 @@ ion-toolbar {
 }
 
 ion-toolbar ion-title {
-  font-weight: 700;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.02em;
+  font-size: var(--app-font-size-lg);
+}
+
+ion-toolbar ion-title.app-brand-title,
+ion-toolbar ion-title.app-brand-title .toolbar-title {
+  font-family: var(--app-font-brand);
+  font-weight: 400;
+  font-size: var(--app-font-size-brand);
+  letter-spacing: 0.01em;
+  text-transform: none;
 }
 
 ion-searchbar {
-  --background: var(--ion-background-color);
-  --border-radius: 12px;
+  --background: var(--app-surface);
+  --border-radius: 16px;
   --box-shadow: none;
   --icon-color: var(--ion-color-medium);
   --placeholder-color: var(--ion-color-medium);
+  font-size: var(--app-font-size-lg);
   box-shadow: none;
   filter: none;
 }
@@ -45,8 +79,8 @@ ion-list {
 }
 
 .inbox-status-segment ion-segment-button::part(indicator-background) {
-  background: rgba(var(--ion-color-primary-rgb), 0.14);
-  border-radius: 10px;
+  background: rgba(var(--ion-color-primary-rgb), 0.12);
+  border-radius: 12px;
 }
 
 .inbox-status-tab__count {
@@ -61,7 +95,7 @@ ion-segment-button.segment-button-checked .inbox-status-tab__count {
 
 .capture-grid__item {
   background: var(--app-surface);
-  border-radius: 12px;
+  border-radius: 20px;
   overflow: hidden;
   text-align: left;
   cursor: pointer;
@@ -94,7 +128,7 @@ ion-segment-button.segment-button-checked .inbox-status-tab__count {
 }
 
 .capture-detail__label {
-  color: rgba(var(--ion-color-secondary-rgb), 0.85);
+  color: rgba(var(--ion-color-secondary-rgb), 0.9);
 }
 
 .attention-scorecard__title {
@@ -110,16 +144,6 @@ ion-button[color='primary'] {
 }
 
 ion-button[color='tertiary'] {
-  --background: rgba(var(--ion-color-secondary-rgb), 0.16);
+  --background: rgba(var(--ion-color-secondary-rgb), 0.14);
   --color: var(--ion-color-secondary);
-}
-
-.settings-theme-toggle {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.75rem;
-}
-
-.settings-theme-toggle ion-button {
-  margin: 0;
 }

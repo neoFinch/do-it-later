@@ -25,7 +25,7 @@ export const getActiveTheme = (): ThemePreference => {
 export const applyTheme = (theme: ThemePreference): void => {
   document.documentElement.classList.toggle('ion-palette-dark', theme === 'dark');
 
-  const themeColor = theme === 'dark' ? '#12161f' : '#faf8f4';
+  const themeColor = theme === 'dark' ? '#0a0a0a' : '#f7f7f7';
   document.querySelectorAll('meta[name="theme-color"]').forEach((meta) => {
     meta.setAttribute('content', themeColor);
   });

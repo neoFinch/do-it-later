@@ -129,7 +129,7 @@ const InboxPage: React.FC = () => {
     <IonPage>
       <IonHeader>
         <IonToolbar>
-          <IonTitle>LATER</IonTitle>
+          <IonTitle className="app-brand-title">Later</IonTitle>
           <IonButtons slot="end">
             <IonButton color="medium" onClick={() => history.push('/settings')} aria-label="Data settings">
               <IonIcon icon={settingsOutline} slot="icon-only" />

@@ -1,0 +1,88 @@
+.settings-page {
+  --padding-start: 1rem;
+  --padding-end: 1rem;
+  --padding-top: 0.5rem;
+  --padding-bottom: 2rem;
+}
+
+.settings-section {
+  margin-top: 1.75rem;
+}
+
+.settings-section:first-child {
+  margin-top: 0.75rem;
+}
+
+.settings-section__title {
+  margin: 0 0 0.35rem;
+  font-family: var(--app-font-title);
+  font-size: var(--app-font-size-lg);
+  font-weight: 500;
+  color: var(--ion-text-color);
+}
+
+.settings-section__desc {
+  margin: 0 0 0.85rem;
+  font-size: var(--app-font-size-sm);
+  line-height: 1.45;
+  color: var(--ion-color-medium);
+}
+
+.settings-section__list {
+  background: var(--app-surface);
+  border: 1px solid var(--app-border-subtle);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.settings-section__list ion-item {
+  --background: transparent;
+  --padding-start: 14px;
+  --inner-padding-end: 14px;
+  --min-height: 52px;
+  --inner-border-width: 0;
+  font-size: var(--app-font-size-md);
+}
+
+.settings-section__list ion-item ion-label {
+  flex: 1;
+  margin-inline-end: 12px;
+}
+
+.settings-section__list ion-toggle {
+  margin-inline-start: auto;
+  flex-shrink: 0;
+}
+
+.settings-section__list ion-item:not(:last-child) {
+  --inner-border-width: 0 0 1px 0;
+  --border-color: var(--app-border-subtle);
+}
+
+.settings-section__hint {
+  margin: 0.65rem 0 0;
+  font-size: var(--app-font-size-xs);
+  line-height: 1.4;
+  color: var(--ion-color-medium);
+}
+
+.settings-section__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.85rem;
+}
+
+.settings-section__actions ion-button {
+  margin: 0;
+  --border-radius: 14px;
+  font-size: var(--app-font-size-md);
+}
+
+.settings-link-button {
+  margin: 0.35rem 0 0;
+  height: auto;
+  font-size: var(--app-font-size-sm);
+  text-transform: none;
+  letter-spacing: normal;
+}
