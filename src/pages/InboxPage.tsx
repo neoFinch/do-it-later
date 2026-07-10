@@ -129,7 +129,7 @@ const InboxPage: React.FC = () => {
     <IonPage>
       <IonHeader>
         <IonToolbar>
-          <IonTitle>LATER</IonTitle>
+          <IonTitle className="app-brand-title">Later</IonTitle>
           <IonButtons slot="end">
             <IonButton color="medium" onClick={() => history.push('/settings')} aria-label="Data settings">
               <IonIcon icon={settingsOutline} slot="icon-only" />
@@ -207,7 +207,7 @@ const InboxPage: React.FC = () => {
         ) : viewMode === 'grid' ? (
           <CaptureGrid captures={captures} onSelect={openCapture} />
         ) : (
-          <IonList lines="full">
+          <IonList lines="none">
             {captures.map((capture) => (
               <CaptureListItem key={capture.id} capture={capture} onSelect={openCapture} />
             ))}

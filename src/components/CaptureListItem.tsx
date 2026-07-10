@@ -86,7 +86,7 @@ const CaptureListItem: React.FC<CaptureListItemProps> = ({ capture, onSelect }) 
   };
 
   return (
-    <IonItem button detail={false} lines="full" className="capture-list-item" onClick={() => onSelect(capture)}>
+    <IonItem button detail={false} lines="none" className="capture-list-item" onClick={() => onSelect(capture)}>
       <div className="capture-list-item__content">
         <CaptureListMedia capture={capture} />
         <div className="capture-list-item__body">

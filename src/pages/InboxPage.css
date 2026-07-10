@@ -19,11 +19,11 @@
 }
 
 .inbox-status-tab ion-icon {
-  font-size: 1.15rem;
+  font-size: 1rem;
 }
 
 .inbox-status-tab__count {
-  font-size: 0.75rem;
+  font-size: var(--app-font-size-sm);
   font-weight: 700;
   line-height: 1;
 }
@@ -38,6 +38,9 @@
 .inbox-search-row__search {
   flex: 1;
   padding-inline-start: 0;
+  --box-shadow: none;
+  --background: var(--app-surface);
+  font-size: var(--app-font-size-lg);
 }
 
 .inbox-search-row__action {
@@ -48,7 +51,7 @@
 .capture-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: 14px;
   padding: 0 12px 16px;
 }
 
@@ -62,12 +65,6 @@
   margin: 0;
   padding: 0;
   border: none;
-  background: var(--ion-item-background, var(--ion-background-color));
-  border-radius: 12px;
-  overflow: hidden;
-  text-align: left;
-  cursor: pointer;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
 }
 
 .capture-grid__media {
@@ -119,8 +116,7 @@
 
 .capture-grid__title {
   margin: 0;
-  font-size: 0.82rem;
-  font-weight: 600;
+  font-size: var(--app-font-size-md);
   line-height: 1.35;
   color: var(--ion-text-color);
   display: -webkit-box;
@@ -130,6 +126,6 @@
 }
 
 .capture-grid__date {
-  font-size: 0.72rem;
+  font-size: var(--app-font-size-xs);
   color: var(--ion-color-medium);
 }

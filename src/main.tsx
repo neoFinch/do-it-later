@@ -2,6 +2,9 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
 import { bootstrapApp } from './app/bootstrap';
+import { initializeTheme } from './services/theme.service';
+
+initializeTheme();
 
 const container = document.getElementById('root');
 const root = createRoot(container!);

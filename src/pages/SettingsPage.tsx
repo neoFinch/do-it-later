@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   IonBackButton,
   IonButton,
@@ -9,17 +9,17 @@ import {
   IonInput,
   IonItem,
   IonLabel,
+  IonList,
   IonPage,
   IonSelect,
   IonSelectOption,
-  IonText,
   IonTitle,
   IonToast,
   IonToggle,
   IonToolbar
 } from '@ionic/react';
 import { Capacitor } from '@capacitor/core';
-import { downloadOutline, cloudUploadOutline } from 'ionicons/icons';
+import { cloudUploadOutline, downloadOutline } from 'ionicons/icons';
 import {
   exportCaptures,
   importCaptures,
@@ -34,6 +34,8 @@ import { ProviderId } from '../services/ai/ai-provider.types';
 import { seedMockCaptures } from '../services/seed.service';
 import { processStaleCaptures } from '../services/processing.service';
 import { useCaptureStore } from '../store/captureStore';
+import { getActiveTheme, saveTheme } from '../services/theme.service';
+import './SettingsPage.css';
 
 const SettingsPage: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -44,8 +46,53 @@ const SettingsPage: React.FC = () => {
   const [model, setModel] = useState(() => getAiConfig().model);
   const [baseUrl, setBaseUrl] = useState(() => getAiConfig().baseUrl);
   const [autoAnalyze, setAutoAnalyze] = useState(() => getAiConfig().autoAnalyze);
+  const [darkMode, setDarkMode] = useState(() => getActiveTheme() === 'dark');
+  const [replaceSampleData, setReplaceSampleData] = useState(false);
   const { reload, repairDatabase } = useCaptureStore();
   const providers = listProviders();
+  const aiSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const persistAiConfig = (next: {
+    providerId?: ProviderId;
+    apiKey?: string;
+    model?: string;
+    baseUrl?: string;
+    autoAnalyze?: boolean;
+  }) => {
+    const config = {
+      providerId: next.providerId ?? providerId,
+      apiKey: (next.apiKey ?? apiKey).trim(),
+      model: (next.model ?? model).trim() || DEFAULT_AI_CONFIG.model,
+      baseUrl: (next.baseUrl ?? baseUrl).trim(),
+      autoAnalyze: next.autoAnalyze ?? autoAnalyze
+    };
+    saveAiConfig(config);
+    void processStaleCaptures(10);
+  };
+
+  const scheduleAiSave = (next: {
+    providerId?: ProviderId;
+    apiKey?: string;
+    model?: string;
+    baseUrl?: string;
+    autoAnalyze?: boolean;
+  }) => {
+    if (aiSaveTimer.current) {
+      clearTimeout(aiSaveTimer.current);
+    }
+    aiSaveTimer.current = setTimeout(() => {
+      persistAiConfig(next);
+      setToastMessage('AI settings saved.');
+    }, 450);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (aiSaveTimer.current) {
+        clearTimeout(aiSaveTimer.current);
+      }
+    };
+  }, []);
 
   const handleExport = async () => {
     setBusy(true);
@@ -124,12 +171,12 @@ const SettingsPage: React.FC = () => {
     }
   };
 
-  const handleLoadSampleData = async (replace: boolean) => {
+  const handleLoadSampleData = async () => {
     setBusy(true);
     try {
-      const result = await seedMockCaptures({ replace });
+      const result = await seedMockCaptures({ replace: replaceSampleData });
       await reload();
-      const action = replace ? 'Replaced with' : 'Loaded';
+      const action = replaceSampleData ? 'Replaced with' : 'Loaded';
       setToastMessage(
         `${action} sample data: ${result.imported} added, ${result.skipped} skipped, ${result.failed} invalid.`
       );
@@ -154,27 +201,20 @@ const SettingsPage: React.FC = () => {
     }
   };
 
-  const handleSaveAiSettings = async () => {
-    saveAiConfig({
-      providerId,
-      apiKey: apiKey.trim(),
-      model: model.trim() || DEFAULT_AI_CONFIG.model,
-      baseUrl: baseUrl.trim(),
-      autoAnalyze
-    });
-    setToastMessage('AI settings saved.');
-    void processStaleCaptures(10);
+  const handleDarkModeChange = (checked: boolean) => {
+    setDarkMode(checked);
+    saveTheme(checked ? 'dark' : 'light');
+  };
+
+  const handleAutoAnalyzeChange = (checked: boolean) => {
+    setAutoAnalyze(checked);
+    persistAiConfig({ autoAnalyze: checked });
+    setToastMessage(checked ? 'Auto-analyze on.' : 'Auto-analyze off.');
   };
 
   const handleClearAiKey = () => {
     setApiKey('');
-    saveAiConfig({
-      providerId,
-      apiKey: '',
-      model: model.trim() || DEFAULT_AI_CONFIG.model,
-      baseUrl: baseUrl.trim(),
-      autoAnalyze
-    });
+    persistAiConfig({ apiKey: '' });
     setToastMessage('API key cleared.');
   };
 
@@ -188,156 +228,179 @@ const SettingsPage: React.FC = () => {
           <IonTitle>Settings</IonTitle>
         </IonToolbar>
       </IonHeader>
-      <IonContent fullscreen className="ion-padding">
-        <IonText color="medium">
-          <h2>AI understanding</h2>
-          <p>
-            V2.0 extracts article text or YouTube transcripts, then analyzes content through a
-            pluggable AI provider to produce structured metadata on each capture.
+      <IonContent fullscreen className="settings-page">
+        <section className="settings-section">
+          <h2 className="settings-section__title">Appearance</h2>
+          <p className="settings-section__desc">Theme preference is saved on this device.</p>
+          <IonList className="settings-section__list" lines="none">
+            <IonItem lines="none">
+              <IonLabel>Dark mode</IonLabel>
+              <IonToggle
+                slot="end"
+                checked={darkMode}
+                onIonChange={(event) => handleDarkModeChange(event.detail.checked)}
+              />
+            </IonItem>
+          </IonList>
+        </section>
+
+        <section className="settings-section">
+          <h2 className="settings-section__title">AI understanding</h2>
+          <p className="settings-section__desc">
+            Extract and analyze captures through a pluggable AI provider. Changes save automatically.
           </p>
-        </IonText>
-        <IonItem className="ion-margin-top">
-          <IonSelect
-            label="Provider"
-            labelPlacement="stacked"
-            value={providerId}
-            onIonChange={(event) => setProviderId(event.detail.value as ProviderId)}
-          >
-            {providers.map((provider) => (
-              <IonSelectOption key={provider.id} value={provider.id}>
-                {provider.displayName}
-              </IonSelectOption>
-            ))}
-          </IonSelect>
-        </IonItem>
-        {providerId === 'openai' && (
-          <IonItem>
-            <IonInput
-              label="OpenAI API key"
-              labelPlacement="stacked"
-              type="password"
-              value={apiKey}
-              placeholder="sk-..."
-              onIonInput={(event) => setApiKey(event.detail.value ?? '')}
-            />
-          </IonItem>
-        )}
-        <IonItem>
-          <IonInput
-            label="Model"
-            labelPlacement="stacked"
-            value={model}
-            placeholder={providerId === 'ollama' ? OLLAMA_DEFAULT_MODEL : DEFAULT_AI_CONFIG.model}
-            onIonInput={(event) => setModel(event.detail.value ?? '')}
+          <IonList className="settings-section__list" lines="full">
+            <IonItem>
+              <IonSelect
+                label="Provider"
+                labelPlacement="stacked"
+                interface="popover"
+                value={providerId}
+                onIonChange={(event) => {
+                  const next = event.detail.value as ProviderId;
+                  setProviderId(next);
+                  scheduleAiSave({ providerId: next });
+                }}
+              >
+                {providers.map((provider) => (
+                  <IonSelectOption key={provider.id} value={provider.id}>
+                    {provider.displayName}
+                  </IonSelectOption>
+                ))}
+              </IonSelect>
+            </IonItem>
+            {providerId === 'openai' && (
+              <IonItem>
+                <IonInput
+                  label="OpenAI API key"
+                  labelPlacement="stacked"
+                  type="password"
+                  value={apiKey}
+                  placeholder="sk-..."
+                  onIonInput={(event) => {
+                    const next = event.detail.value ?? '';
+                    setApiKey(next);
+                    scheduleAiSave({ apiKey: next });
+                  }}
+                />
+              </IonItem>
+            )}
+            <IonItem>
+              <IonInput
+                label="Model"
+                labelPlacement="stacked"
+                value={model}
+                placeholder={providerId === 'ollama' ? OLLAMA_DEFAULT_MODEL : DEFAULT_AI_CONFIG.model}
+                onIonInput={(event) => {
+                  const next = event.detail.value ?? '';
+                  setModel(next);
+                  scheduleAiSave({ model: next });
+                }}
+              />
+            </IonItem>
+            {providerId === 'ollama' && (
+              <IonItem>
+                <IonInput
+                  label="Ollama base URL"
+                  labelPlacement="stacked"
+                  value={baseUrl}
+                  placeholder="http://localhost:11434"
+                  onIonInput={(event) => {
+                    const next = event.detail.value ?? '';
+                    setBaseUrl(next);
+                    scheduleAiSave({ baseUrl: next });
+                  }}
+                />
+              </IonItem>
+            )}
+            <IonItem lines="none">
+              <IonLabel>Analyze new captures automatically</IonLabel>
+              <IonToggle
+                slot="end"
+                checked={autoAnalyze}
+                onIonChange={(event) => handleAutoAnalyzeChange(event.detail.checked)}
+              />
+            </IonItem>
+          </IonList>
+          {providerId === 'openai' && apiKey && (
+            <IonButton
+              fill="clear"
+              color="medium"
+              className="settings-link-button"
+              disabled={busy}
+              onClick={handleClearAiKey}
+            >
+              Clear API key
+            </IonButton>
+          )}
+        </section>
+
+        <section className="settings-section">
+          <h2 className="settings-section__title">Data</h2>
+          <p className="settings-section__desc">
+            Export a JSON backup, or import one to merge captures. Duplicates are skipped.
+          </p>
+          <div className="settings-section__actions">
+            <IonButton expand="block" fill="outline" color="medium" disabled={busy} onClick={handleExport}>
+              <IonIcon icon={downloadOutline} slot="start" />
+              Export captures
+            </IonButton>
+            <IonButton expand="block" fill="solid" color="primary" disabled={busy} onClick={handleImportClick}>
+              <IonIcon icon={cloudUploadOutline} slot="start" />
+              Import captures
+            </IonButton>
+          </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json,application/json,text/plain"
+            hidden
+            onChange={handleImportFile}
           />
-        </IonItem>
-        {providerId === 'ollama' && (
-          <IonItem>
-            <IonInput
-              label="Ollama base URL"
-              labelPlacement="stacked"
-              value={baseUrl}
-              placeholder="http://localhost:11434"
-              onIonInput={(event) => setBaseUrl(event.detail.value ?? '')}
-            />
-          </IonItem>
-        )}
-        <IonItem lines="none">
-          <IonLabel>Analyze new captures automatically</IonLabel>
-          <IonToggle checked={autoAnalyze} onIonChange={(event) => setAutoAnalyze(event.detail.checked)} />
-        </IonItem>
-        <IonButton expand="block" color="primary" disabled={busy} onClick={handleSaveAiSettings}>
-          Save AI settings
-        </IonButton>
-        {providerId === 'openai' && (
+          <p className="settings-section__hint">
+            Need a reset? Repair rebuilds the local database if saves start failing.
+          </p>
           <IonButton
-            expand="block"
-            fill="outline"
-            color="medium"
-            disabled={busy || !apiKey}
-            onClick={handleClearAiKey}
-            className="ion-margin-top"
+            fill="clear"
+            color="danger"
+            className="settings-link-button"
+            disabled={busy}
+            onClick={handleRepairDatabase}
           >
-            Clear API key
+            Repair database
           </IonButton>
+        </section>
+
+        {import.meta.env.DEV && (
+          <section className="settings-section">
+            <h2 className="settings-section__title">Development</h2>
+            <p className="settings-section__desc">
+              Load captures from <code>mock-data/mock-capture-data.json</code> for UI testing.
+            </p>
+            <IonList className="settings-section__list" lines="none">
+              <IonItem>
+                <IonLabel>Replace existing captures</IonLabel>
+                <IonToggle
+                  slot="end"
+                  checked={replaceSampleData}
+                  onIonChange={(event) => setReplaceSampleData(event.detail.checked)}
+                />
+              </IonItem>
+            </IonList>
+            <div className="settings-section__actions">
+              <IonButton expand="block" fill="outline" color="medium" disabled={busy} onClick={handleLoadSampleData}>
+                {replaceSampleData ? 'Replace with sample data' : 'Load sample data'}
+              </IonButton>
+            </div>
+          </section>
         )}
 
-        <IonText color="medium">
-          <h2 className="ion-margin-top">Data</h2>
-          <p>
-            Export your captures to a JSON backup file, or import a backup to merge items into this
-            device. Existing captures are kept; duplicates are skipped.
-          </p>
-        </IonText>
-        <IonButton
-          expand="block"
-          fill="outline"
-          color="secondary"
-          disabled={busy}
-          onClick={handleExport}
-          className="ion-margin-top"
-        >
-          <IonIcon icon={downloadOutline} slot="start" />
-          Export captures
-        </IonButton>
-        <IonButton
-          expand="block"
-          color="success"
-          disabled={busy}
-          onClick={handleImportClick}
-          className="ion-margin-top"
-        >
-          <IonIcon icon={cloudUploadOutline} slot="start" />
-          Import captures
-        </IonButton>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".json,application/json,text/plain"
-          hidden
-          onChange={handleImportFile}
+        <IonToast
+          isOpen={!!toastMessage}
+          message={toastMessage}
+          duration={2500}
+          onDidDismiss={() => setToastMessage('')}
         />
-        <IonButton
-          expand="block"
-          fill="outline"
-          color="danger"
-          disabled={busy}
-          onClick={handleRepairDatabase}
-          className="ion-margin-top"
-        >
-          Repair database
-        </IonButton>
-        {import.meta.env.DEV && (
-          <>
-            <IonText color="medium">
-              <p className="ion-margin-top">
-                Development: load captures from <code>mock-data/mock-capture-data.json</code> for UI
-                testing.
-              </p>
-            </IonText>
-            <IonButton
-              expand="block"
-              fill="outline"
-              color="tertiary"
-              disabled={busy}
-              onClick={() => handleLoadSampleData(false)}
-              className="ion-margin-top"
-            >
-              Load sample data
-            </IonButton>
-            <IonButton
-              expand="block"
-              fill="outline"
-              color="warning"
-              disabled={busy}
-              onClick={() => handleLoadSampleData(true)}
-              className="ion-margin-top"
-            >
-              Replace with sample data
-            </IonButton>
-          </>
-        )}
-        <IonToast isOpen={!!toastMessage} message={toastMessage} duration={2500} onDidDismiss={() => setToastMessage('')} />
       </IonContent>
     </IonPage>
   );
