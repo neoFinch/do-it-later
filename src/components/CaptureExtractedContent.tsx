@@ -3,6 +3,10 @@ import { alertCircleOutline, refreshOutline } from 'ionicons/icons';
 import { CaptureProcessing } from '../types/capture-processing';
 import { ContentDocument } from '../types/content-document';
 
+// TODO(product): Consider hiding this section from end users. Extraction should
+// still run for AI analysis, but the raw transcript/article preview may be
+// noise on the detail screen. Parked — keep for debugging until UX is settled.
+
 interface CaptureExtractedContentProps {
   processing: CaptureProcessing | null;
   document: ContentDocument | null;

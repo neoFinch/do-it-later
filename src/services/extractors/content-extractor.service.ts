@@ -4,6 +4,8 @@ import { detectLinkPlatform } from '../link.service';
 import { getYouTubeThumbnailUrl } from '../thumbnail.service';
 import { fetchPageHtml, parseOpenGraphMetadata } from '../metadata.service';
 import { extractArticleText, estimateReadingMinutes } from './article-text';
+import { hasUsableExtractedContent } from './document-body';
+import { cleanInstagramExtractedText, looksLikeInstagramChrome } from './social-text';
 import { estimateWatchMinutes, extractYouTubeTranscript } from './youtube.extractor';
 
 export interface ExtractionResult {
@@ -57,45 +59,76 @@ export const extractUrlContent = async (capture: Capture): Promise<ExtractionRes
   const platform = detectLinkPlatform(url);
 
   if (platform === 'youtube') {
-    const { transcript, duration } = await extractYouTubeTranscript(url);
+    const extracted = await extractYouTubeTranscript(url);
     const document = buildDocument(capture.id, 'youtube', {
-      title: capture.title,
-      transcript,
-      duration,
+      title: extracted.title ?? capture.title,
+      description: extracted.description ?? null,
+      transcript: extracted.transcript || null,
+      author: extracted.author ?? null,
+      duration: extracted.duration ?? null,
       thumbnail: capture.thumbnail ?? getYouTubeThumbnailUrl(url)
     });
+
+    if (!hasUsableExtractedContent(document)) {
+      throw new Error('Could not extract usable YouTube content (no transcript or description).');
+    }
 
     return {
       document,
       estimatedReadingTime: null,
-      estimatedWatchTime: estimateWatchMinutes(duration)
+      estimatedWatchTime: estimateWatchMinutes(extracted.duration)
     };
   }
 
   const html = await fetchPageHtml(url);
-  const metadata = parseOpenGraphMetadata(html);
+  const metadata = parseOpenGraphMetadata(html, url);
   let articleText = extractArticleText(html);
 
-  if (!articleText && (platform === 'instagram' || platform === 'twitter' || platform === 'tiktok')) {
-    articleText = [metadata.title, capture.title, capture.content].filter(Boolean).join('\n\n').trim();
+  if (platform === 'instagram') {
+    const metaCaption = metadata.description?.trim() || '';
+    const cleanedHtml = articleText ? cleanInstagramExtractedText(articleText) : '';
+    const metaLooksClean = metaCaption.length >= 40 && !looksLikeInstagramChrome(metaCaption);
+
+    if (metaLooksClean) {
+      articleText = metaCaption;
+    } else if (cleanedHtml) {
+      articleText = cleanedHtml;
+    } else {
+      articleText = [metaCaption, capture.title, capture.content].filter(Boolean).join('\n\n').trim();
+      articleText = articleText ? cleanInstagramExtractedText(articleText) : '';
+    }
+  } else if (!articleText && (platform === 'twitter' || platform === 'tiktok')) {
+    articleText = [metadata.description, metadata.title, capture.title, capture.content]
+      .filter(Boolean)
+      .join('\n\n')
+      .trim();
   }
 
   if (!articleText) {
-    throw new Error('Could not extract article text from page.');
+    const fallback = [metadata.description, metadata.title, capture.title, capture.content]
+      .filter(Boolean)
+      .join('\n\n')
+      .trim();
+    if (fallback) {
+      articleText = platform === 'instagram' ? cleanInstagramExtractedText(fallback) : fallback;
+    }
   }
 
-  const source: ContentSource = platform === 'instagram' ? 'instagram' : 'article';
-  const document = buildDocument(capture.id, source, {
+  const document = buildDocument(capture.id, platform === 'instagram' ? 'instagram' : 'article', {
     title: metadata.title ?? capture.title,
-    description: metadata.title ?? null,
-    articleText,
+    description: metadata.description ?? null,
+    articleText: articleText || null,
     thumbnail: metadata.thumbnail ?? capture.thumbnail,
-    author: metadata.source ?? null
+    author: metadata.author ?? metadata.source ?? null
   });
+
+  if (!hasUsableExtractedContent(document)) {
+    throw new Error('Could not extract usable page content.');
+  }
 
   return {
     document,
-    estimatedReadingTime: estimateReadingMinutes(articleText),
+    estimatedReadingTime: articleText ? estimateReadingMinutes(articleText) : null,
     estimatedWatchTime: null
   };
 };

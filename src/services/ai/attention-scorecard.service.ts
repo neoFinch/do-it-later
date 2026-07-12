@@ -1,5 +1,6 @@
-import { AIAnalysis, ExpectationLevel, ImplementationLevel, LearningStyle } from '../../types/ai-analysis';
+import { AIAnalysis, ExpectationLevel } from '../../types/ai-analysis';
 import { AttentionScorecard, Recommendation } from '../../types/attention-scorecard';
+import { getLensPack } from './lenses';
 
 const LEVEL_TO_STARS: Record<ExpectationLevel, number> = {
   low: 2,
@@ -11,19 +12,6 @@ const DISAPPOINTMENT_PENALTY: Record<ExpectationLevel, number> = {
   low: 0,
   medium: 0.75,
   high: 1.5
-};
-
-const LEARNING_STYLE_LABELS: Record<LearningStyle, string> = {
-  conceptual: 'Conceptual',
-  mixed: 'Mixed',
-  practical: 'Practical'
-};
-
-const IMPLEMENTATION_LABELS: Record<ImplementationLevel, string> = {
-  none: 'None',
-  low: 'Low',
-  medium: 'Medium',
-  high: 'High'
 };
 
 const DISAPPOINTMENT_LABELS: Record<ExpectationLevel, string> = {
@@ -40,27 +28,30 @@ const RECOMMENDATION_LABELS: Record<Recommendation, string> = {
 
 const clampStars = (value: number): number => Math.min(5, Math.max(1, Math.round(value)));
 
-export const deriveExpectedLearningStars = (analysis: AIAnalysis): number => {
-  const base = LEVEL_TO_STARS[analysis.expectedLearning];
-  const learnableCount = analysis.viewerExpectation.youWillLearn.length;
+export const deriveExpectedValueStars = (analysis: AIAnalysis): number => {
+  const base = LEVEL_TO_STARS[analysis.expectedValue];
+  const promiseCount = analysis.viewerExpectation.youWillGet.length;
 
-  if (learnableCount >= 4) {
+  if (promiseCount >= 4) {
     return clampStars(base + 0.5);
   }
 
-  if (learnableCount <= 1 && analysis.expectedLearning !== 'high') {
+  if (promiseCount <= 1 && analysis.expectedValue !== 'high') {
     return clampStars(base - 0.5);
   }
 
   return clampStars(base);
 };
 
+/** @deprecated Use deriveExpectedValueStars */
+export const deriveExpectedLearningStars = deriveExpectedValueStars;
+
 export const deriveWorthYourTimeStars = (analysis: AIAnalysis): number => {
-  const learningValue = LEVEL_TO_STARS[analysis.expectedLearning];
+  const value = LEVEL_TO_STARS[analysis.expectedValue];
   const penalty = DISAPPOINTMENT_PENALTY[analysis.potentialDisappointment];
   const confidenceBoost = (analysis.confidence - 0.5) * 0.5;
 
-  return clampStars(learningValue - penalty + confidenceBoost);
+  return clampStars(value - penalty + confidenceBoost);
 };
 
 export const deriveRecommendation = (
@@ -82,24 +73,62 @@ export const deriveRecommendation = (
   return 'read_later';
 };
 
+const normalizeVerdictText = (value: string): string =>
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ');
+
+/** Drop LLM recommendation text when it only repeats the derived verdict (e.g. "Skip" under "Skip"). */
+export const resolveRecommendationText = (
+  analysis: AIAnalysis,
+  recommendationLabel: string
+): string => {
+  const candidates = [analysis.recommendation, analysis.summary, analysis.reasoning]
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  const verdict = normalizeVerdictText(recommendationLabel);
+  const verdictAliases = new Set([
+    verdict,
+    normalizeVerdictText(recommendationLabel.replace(/\s+/g, '_')),
+    'skip',
+    'read now',
+    'read later',
+    'read_now',
+    'read_later'
+  ]);
+
+  for (const candidate of candidates) {
+    if (!verdictAliases.has(normalizeVerdictText(candidate))) {
+      return candidate;
+    }
+  }
+
+  return '';
+};
+
 export const buildAttentionScorecard = (analysis: AIAnalysis): AttentionScorecard => {
   const worthYourTimeStars = deriveWorthYourTimeStars(analysis);
   const recommendation = deriveRecommendation(analysis, worthYourTimeStars);
+  const recommendationLabel = RECOMMENDATION_LABELS[recommendation];
   const estimatedTimeMinutes = analysis.estimatedWatchTime ?? analysis.estimatedReadingTime;
+  const pack = getLensPack(analysis.lens);
 
   return {
     recommendation,
-    recommendationLabel: RECOMMENDATION_LABELS[recommendation],
+    recommendationLabel,
     worthYourTimeStars,
     confidencePercent: Math.round(analysis.confidence * 100),
     estimatedTimeMinutes,
-    learningStyleLabel: LEARNING_STYLE_LABELS[analysis.learningStyle],
-    implementationLevelLabel: IMPLEMENTATION_LABELS[analysis.implementationLevel],
-    expectedLearningStars: deriveExpectedLearningStars(analysis),
+    lensLabel: pack.label,
+    highlightMetrics: pack.metrics(analysis.lensFields ?? {}),
+    expectedValueStars: deriveExpectedValueStars(analysis),
     potentialDisappointmentLabel: DISAPPOINTMENT_LABELS[analysis.potentialDisappointment],
-    youWillLearn: analysis.viewerExpectation.youWillLearn,
-    youWillNotLearn: analysis.viewerExpectation.youWillNotLearn,
-    recommendationText: analysis.recommendation.trim() || analysis.summary.trim() || analysis.reasoning.trim()
+    youWillGet: analysis.viewerExpectation.youWillGet,
+    youWillNotGet: analysis.viewerExpectation.youWillNotGet,
+    recommendationText: resolveRecommendationText(analysis, recommendationLabel)
   };
 };
 

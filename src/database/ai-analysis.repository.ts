@@ -1,58 +1,36 @@
 import { Capacitor } from '@capacitor/core';
 import {
   AIAnalysis,
+  AnalysisLens,
   ContentType,
-  Difficulty,
+  CURRENT_ANALYSIS_SCHEMA_VERSION,
   ExpectationLevel,
-  ImplementationLevel,
-  LearningStyle,
   ViewerExpectation
 } from '../types/ai-analysis';
+import { normalizeLens } from '../services/ai/lenses';
 import { parseJsonArray, stringifyJsonArray } from '../utils/json-field';
 import { getDatabase, initDatabase } from './sqlite';
 
 const isWeb = Capacitor.getPlatform() === 'web';
-const STORAGE_KEY = 'later:ai_analysis_v3';
+const STORAGE_KEY = 'later:ai_analysis_v5';
+const LEGACY_STORAGE_KEYS = ['later:ai_analysis_v3'];
 
-const VALID_DIFFICULTIES: Difficulty[] = ['beginner', 'intermediate', 'advanced'];
 const VALID_CONTENT_TYPES: ContentType[] = [
   'tutorial',
   'deep-dive',
   'reference',
   'news',
   'opinion',
+  'entertainment',
   'other'
 ];
-const VALID_IMPLEMENTATION_LEVELS: ImplementationLevel[] = ['none', 'low', 'medium', 'high'];
-const VALID_LEARNING_STYLES: LearningStyle[] = ['conceptual', 'mixed', 'practical'];
 const VALID_EXPECTATION_LEVELS: ExpectationLevel[] = ['low', 'medium', 'high'];
-
-const normalizeDifficulty = (value: unknown): Difficulty => {
-  if (typeof value === 'string' && VALID_DIFFICULTIES.includes(value as Difficulty)) {
-    return value as Difficulty;
-  }
-  return 'intermediate';
-};
 
 const normalizeContentType = (value: unknown): ContentType => {
   if (typeof value === 'string' && VALID_CONTENT_TYPES.includes(value as ContentType)) {
     return value as ContentType;
   }
   return 'other';
-};
-
-const normalizeImplementationLevel = (value: unknown): ImplementationLevel => {
-  if (typeof value === 'string' && VALID_IMPLEMENTATION_LEVELS.includes(value as ImplementationLevel)) {
-    return value as ImplementationLevel;
-  }
-  return 'none';
-};
-
-const normalizeLearningStyle = (value: unknown): LearningStyle => {
-  if (typeof value === 'string' && VALID_LEARNING_STYLES.includes(value as LearningStyle)) {
-    return value as LearningStyle;
-  }
-  return 'conceptual';
 };
 
 const normalizeExpectationLevel = (value: unknown): ExpectationLevel => {
@@ -62,28 +40,87 @@ const normalizeExpectationLevel = (value: unknown): ExpectationLevel => {
   return 'medium';
 };
 
-const normalizeViewerExpectation = (value: unknown): ViewerExpectation => {
-  if (typeof value === 'object' && value) {
-    const record = value as Record<string, unknown>;
+const normalizeViewerExpectation = (item: Record<string, unknown>): ViewerExpectation => {
+  const nested = item.viewerExpectation as Record<string, unknown> | undefined;
+  if (nested && typeof nested === 'object') {
     return {
-      youWillLearn: parseJsonArray(record.youWillLearn),
-      youWillNotLearn: parseJsonArray(record.youWillNotLearn)
+      youWillGet: parseJsonArray(nested.youWillGet ?? nested.youWillLearn),
+      youWillNotGet: parseJsonArray(nested.youWillNotGet ?? nested.youWillNotLearn)
     };
   }
-  return { youWillLearn: [], youWillNotLearn: [] };
+  return {
+    youWillGet: parseJsonArray(item.youWillGet ?? item.youWillLearn),
+    youWillNotGet: parseJsonArray(item.youWillNotGet ?? item.youWillNotLearn)
+  };
 };
 
-const normalizeStoredAnalysis = (item: AIAnalysis): AIAnalysis => ({
-  ...item,
-  expectedLearning: item.expectedLearning ?? 'medium',
-  potentialDisappointment: item.potentialDisappointment ?? 'medium',
-  recommendation: item.recommendation ?? item.summary ?? ''
-});
+const buildLegacyLensFields = (item: Record<string, unknown>): Record<string, unknown> => {
+  if (item.lensFields && typeof item.lensFields === 'object' && !Array.isArray(item.lensFields)) {
+    return item.lensFields as Record<string, unknown>;
+  }
+  const fields: Record<string, unknown> = {};
+  if (item.implementationLevel != null) {
+    fields.implementationLevel = item.implementationLevel;
+  }
+  if (item.learningStyle != null) {
+    fields.learningStyle = item.learningStyle;
+  }
+  if (item.codeWalkthrough != null) {
+    fields.codeWalkthrough = item.codeWalkthrough;
+  }
+  if (item.difficulty != null) {
+    fields.difficulty = item.difficulty;
+  }
+  if (item.prerequisites != null) {
+    fields.prerequisites = Array.isArray(item.prerequisites)
+      ? item.prerequisites
+      : parseJsonArray(item.prerequisites);
+  }
+  return fields;
+};
+
+const normalizeStoredAnalysis = (item: Record<string, unknown>): AIAnalysis => {
+  const viewerExpectation = normalizeViewerExpectation(item);
+  const lens = normalizeLens(item.lens ?? 'technology');
+
+  return {
+    schemaVersion: Number(item.schemaVersion) || CURRENT_ANALYSIS_SCHEMA_VERSION,
+    captureId: String(item.captureId),
+    lens,
+    summary: String(item.summary ?? ''),
+    topics: parseJsonArray(item.topics),
+    contentType: normalizeContentType(item.contentType),
+    targetAudience: parseJsonArray(item.targetAudience),
+    estimatedReadingTime: item.estimatedReadingTime != null ? Number(item.estimatedReadingTime) : null,
+    estimatedWatchTime: item.estimatedWatchTime != null ? Number(item.estimatedWatchTime) : null,
+    viewerExpectation,
+    expectedValue: normalizeExpectationLevel(item.expectedValue ?? item.expectedLearning),
+    potentialDisappointment: normalizeExpectationLevel(item.potentialDisappointment),
+    lensFields: buildLegacyLensFields(item),
+    recommendation: String(item.recommendation ?? item.summary ?? ''),
+    reasoning: String(item.reasoning ?? ''),
+    confidence: Number(item.confidence ?? 0),
+    analyzedAt: Number(item.analyzedAt ?? Date.now())
+  };
+};
 
 const readStorage = (): AIAnalysis[] => {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY) ?? '[]';
-    return (JSON.parse(raw) as AIAnalysis[]).map(normalizeStoredAnalysis);
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      return (JSON.parse(raw) as Record<string, unknown>[]).map(normalizeStoredAnalysis);
+    }
+
+    for (const key of LEGACY_STORAGE_KEYS) {
+      const legacy = localStorage.getItem(key);
+      if (legacy) {
+        const migrated = (JSON.parse(legacy) as Record<string, unknown>[]).map(normalizeStoredAnalysis);
+        writeStorage(migrated);
+        return migrated;
+      }
+    }
+
+    return [];
   } catch {
     return [];
   }
@@ -93,32 +130,46 @@ const writeStorage = (items: AIAnalysis[]): void => {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
 };
 
-const mapRow = (row: Record<string, unknown>): AIAnalysis => ({
-  captureId: String(row.captureId),
-  topics: parseJsonArray(row.topics),
-  difficulty: normalizeDifficulty(row.difficulty),
-  targetAudience: parseJsonArray(row.targetAudience),
-  contentType: normalizeContentType(row.contentType),
-  implementationLevel: normalizeImplementationLevel(row.implementationLevel),
-  learningStyle: normalizeLearningStyle(row.learningStyle),
-  codeWalkthrough: Boolean(row.codeWalkthrough),
-  viewerExpectation: {
-    youWillLearn: parseJsonArray(row.viewerExpectationYouWillLearn),
-    youWillNotLearn: parseJsonArray(row.viewerExpectationYouWillNotLearn)
-  },
-  expectedLearning: normalizeExpectationLevel(row.expectedLearning),
-  potentialDisappointment: normalizeExpectationLevel(row.potentialDisappointment),
-  recommendation: String(row.recommendation ?? row.summary ?? ''),
-  estimatedReadingTime: row.estimatedReadingTime != null ? Number(row.estimatedReadingTime) : null,
-  estimatedWatchTime: row.estimatedWatchTime != null ? Number(row.estimatedWatchTime) : null,
-  prerequisites: parseJsonArray(row.prerequisites),
-  learningOutcomes: parseJsonArray(row.learningOutcomes),
-  summary: String(row.summary ?? ''),
-  keyTakeaways: parseJsonArray(row.keyTakeaways),
-  reasoning: String(row.reasoning ?? ''),
-  confidence: Number(row.confidence ?? 0),
-  analyzedAt: Number(row.analyzedAt)
-});
+const mapRow = (row: Record<string, unknown>): AIAnalysis => {
+  const youWillGet = parseJsonArray(row.viewerExpectationYouWillGet ?? row.viewerExpectationYouWillLearn);
+  const youWillNotGet = parseJsonArray(
+    row.viewerExpectationYouWillNotGet ?? row.viewerExpectationYouWillNotLearn
+  );
+
+  let lensFields: Record<string, unknown> = {};
+  try {
+    lensFields =
+      row.lensFields != null && String(row.lensFields).trim()
+        ? (JSON.parse(String(row.lensFields)) as Record<string, unknown>)
+        : {};
+  } catch {
+    lensFields = {};
+  }
+
+  if (Object.keys(lensFields).length === 0) {
+    lensFields = buildLegacyLensFields(row);
+  }
+
+  return {
+    schemaVersion: Number(row.schemaVersion) || CURRENT_ANALYSIS_SCHEMA_VERSION,
+    captureId: String(row.captureId),
+    lens: normalizeLens(row.lens ?? 'technology') as AnalysisLens,
+    summary: String(row.summary ?? ''),
+    topics: parseJsonArray(row.topics),
+    contentType: normalizeContentType(row.contentType),
+    targetAudience: parseJsonArray(row.targetAudience),
+    estimatedReadingTime: row.estimatedReadingTime != null ? Number(row.estimatedReadingTime) : null,
+    estimatedWatchTime: row.estimatedWatchTime != null ? Number(row.estimatedWatchTime) : null,
+    viewerExpectation: { youWillGet, youWillNotGet },
+    expectedValue: normalizeExpectationLevel(row.expectedValue ?? row.expectedLearning),
+    potentialDisappointment: normalizeExpectationLevel(row.potentialDisappointment),
+    lensFields,
+    recommendation: String(row.recommendation ?? row.summary ?? ''),
+    reasoning: String(row.reasoning ?? ''),
+    confidence: Number(row.confidence ?? 0),
+    analyzedAt: Number(row.analyzedAt)
+  };
+};
 
 export const initializeAiAnalysisTable = async (): Promise<void> => {
   if (isWeb) {
@@ -153,35 +204,49 @@ export const saveAiAnalysis = async (analysis: AIAnalysis): Promise<void> => {
   const db = await getDatabase();
   await db.run(
     `INSERT OR REPLACE INTO ai_analysis
-      (captureId, topics, difficulty, targetAudience, contentType, implementationLevel, learningStyle,
-       codeWalkthrough, viewerExpectationYouWillLearn, viewerExpectationYouWillNotLearn,
-       expectedLearning, potentialDisappointment, recommendation,
-       estimatedReadingTime, estimatedWatchTime, prerequisites, learningOutcomes, summary,
-       keyTakeaways, reasoning, confidence, analyzedAt)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+      (captureId, schemaVersion, lens, topics, targetAudience, contentType,
+       viewerExpectationYouWillGet, viewerExpectationYouWillNotGet,
+       expectedValue, potentialDisappointment, recommendation,
+       estimatedReadingTime, estimatedWatchTime, lensFields, summary,
+       reasoning, confidence, analyzedAt,
+       difficulty, implementationLevel, learningStyle, codeWalkthrough,
+       viewerExpectationYouWillLearn, viewerExpectationYouWillNotLearn,
+       expectedLearning, prerequisites, learningOutcomes, keyTakeaways)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
     [
       analysis.captureId,
+      analysis.schemaVersion,
+      analysis.lens,
       stringifyJsonArray(analysis.topics),
-      analysis.difficulty,
       stringifyJsonArray(analysis.targetAudience),
       analysis.contentType,
-      analysis.implementationLevel,
-      analysis.learningStyle,
-      analysis.codeWalkthrough ? 1 : 0,
-      stringifyJsonArray(analysis.viewerExpectation.youWillLearn),
-      stringifyJsonArray(analysis.viewerExpectation.youWillNotLearn),
-      analysis.expectedLearning,
+      stringifyJsonArray(analysis.viewerExpectation.youWillGet),
+      stringifyJsonArray(analysis.viewerExpectation.youWillNotGet),
+      analysis.expectedValue,
       analysis.potentialDisappointment,
       analysis.recommendation,
       analysis.estimatedReadingTime,
       analysis.estimatedWatchTime,
-      stringifyJsonArray(analysis.prerequisites),
-      stringifyJsonArray(analysis.learningOutcomes),
+      JSON.stringify(analysis.lensFields ?? {}),
       analysis.summary,
-      stringifyJsonArray(analysis.keyTakeaways),
       analysis.reasoning,
       analysis.confidence,
-      analysis.analyzedAt
+      analysis.analyzedAt,
+      // Legacy columns kept for older readers / safe defaults
+      String(analysis.lensFields.difficulty ?? 'intermediate'),
+      String(analysis.lensFields.implementationLevel ?? 'none'),
+      String(analysis.lensFields.learningStyle ?? 'conceptual'),
+      analysis.lensFields.codeWalkthrough ? 1 : 0,
+      stringifyJsonArray(analysis.viewerExpectation.youWillGet),
+      stringifyJsonArray(analysis.viewerExpectation.youWillNotGet),
+      analysis.expectedValue,
+      stringifyJsonArray(
+        Array.isArray(analysis.lensFields.prerequisites)
+          ? (analysis.lensFields.prerequisites as string[])
+          : []
+      ),
+      '[]',
+      '[]'
     ],
     true
   );

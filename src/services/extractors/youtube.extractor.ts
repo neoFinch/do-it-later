@@ -286,7 +286,24 @@ const fetchTranscriptFromTrack = async (track: CaptionTrack, videoId: string): P
 export interface YouTubeExtraction {
   transcript: string;
   duration?: number | null;
+  title?: string | null;
+  description?: string | null;
+  author?: string | null;
 }
+
+interface VideoDetails {
+  title?: string;
+  shortDescription?: string;
+  author?: string;
+  lengthSeconds?: string;
+}
+
+const parseVideoDetails = (html: string): VideoDetails | null => {
+  const player = extractBalancedJson(html, 'ytInitialPlayerResponse') as {
+    videoDetails?: VideoDetails;
+  } | null;
+  return player?.videoDetails ?? null;
+};
 
 export const extractYouTubeTranscript = async (url: string): Promise<YouTubeExtraction> => {
   const videoId = extractYouTubeVideoId(url);
@@ -296,30 +313,50 @@ export const extractYouTubeTranscript = async (url: string): Promise<YouTubeExtr
 
   const watchUrl = normalizeUrl(`https://www.youtube.com/watch?v=${videoId}`);
   const html = await fetchRemoteText(watchUrl, { userAgent: YOUTUBE_USER_AGENT });
+  const details = parseVideoDetails(html);
+
+  let duration: number | null = null;
+  const lengthSeconds = details?.lengthSeconds ?? html.match(/"lengthSeconds":"(\d+)"/)?.[1];
+  if (lengthSeconds) {
+    duration = Number(lengthSeconds);
+  }
+
+  const meta = {
+    title: details?.title?.trim() || null,
+    description: details?.shortDescription?.trim() || null,
+    author: details?.author?.trim() || null,
+    duration
+  };
+
   const tracks = await fetchCaptionTracks(videoId, html);
   const track = pickCaptionTrack(tracks);
 
   if (!track?.baseUrl) {
+    if (meta.title || meta.description) {
+      return {
+        transcript: '',
+        ...meta
+      };
+    }
     throw new Error('No captions available for this video.');
   }
 
   const transcript = await fetchTranscriptFromTrack(track, videoId);
   if (!transcript) {
+    if (meta.title || meta.description) {
+      return {
+        transcript: '',
+        ...meta
+      };
+    }
     throw new Error(
       'Could not read the YouTube transcript. The video may have captions in the app but block automated access.'
     );
   }
 
-  let duration: number | null = null;
-  const player = extractBalancedJson(html, 'ytInitialPlayerResponse') as { videoDetails?: { lengthSeconds?: string } } | null;
-  const lengthSeconds = player?.videoDetails?.lengthSeconds ?? html.match(/"lengthSeconds":"(\d+)"/)?.[1];
-  if (lengthSeconds) {
-    duration = Number(lengthSeconds);
-  }
-
   return {
     transcript: transcript.slice(0, 50_000),
-    duration
+    ...meta
   };
 };
 

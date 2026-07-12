@@ -5,7 +5,8 @@
 This document describes the technical implementation of Capture Inbox.
 
 Business decisions belong in the product documents.
-This document focuses on architecture.
+AI shape and provider strategy belong in [AI-Architecture.md](./AI-Architecture.md).
+This document focuses on how the app is built.
 
 ---
 
@@ -23,19 +24,25 @@ This document focuses on architecture.
 
 # High-Level Architecture
 
+Aligned with the durable AI layers in AI-Architecture.md:
+
 ```text
 Capture
       ↓
 Content Extraction
       ↓
-Normalized Content
+ContentDocument
       ↓
-AI Analysis
+Content Analysis (versioned, one LLM pass)
       ↓
-Recommendation Engine
+Attention Decision (scorecard)
       ↓
-User Feedback
+User Signals (later)
 ```
+
+Providers (OpenAI, Ollama, optional Local LLM experiment) plug into analysis via
+a shared `complete({ system, user })` contract. See AI-Architecture.md for
+defaults vs experimental on-device path.
 
 ---
 
@@ -48,11 +55,11 @@ src/
 ├── hooks/
 ├── stores/
 ├── database/
-├── repositories/
 ├── services/
-│   ├── capture/
 │   ├── extractors/
 │   └── ai/
+│       ├── providers/     # openai, ollama, null, (future: local-llm)
+│       └── ...
 ├── types/
 └── utils/
 ```
@@ -62,22 +69,24 @@ src/
 # Stores
 
 ## CaptureStore
+
 - CRUD
 - Search
 - Status
 
-## AIStore
-- Analysis
-- Recommendations
-- Regeneration
-
 ## ReviewStore
+
 - Review queue
 - Keep
 - Skip
 - Delete
 
-## UserStore
+AI analysis is service- and repository-driven today (not a dedicated Zustand
+store). A thin AI store can be added later if UI needs reactive regeneration
+state.
+
+## UserStore (later)
+
 - Goals
 - Interests
 - Preferences
@@ -87,10 +96,11 @@ src/
 # Services
 
 - Capture Service
-- Content Extractor
-- AI Analysis Service
-- Recommendation Engine
-- Feedback Service
+- Content Extractor(s)
+- Content Analysis Service
+- Attention Scorecard / Decision
+- AI provider registry (OpenAI / Ollama / null; Local LLM experimental)
+- Feedback Service (later)
 
 ---
 
@@ -109,12 +119,15 @@ Waiting For AI Analysis
         ↓
 Analyzing
         ↓
-Recommendation Ready
+Decision Ready
         ↓
 Reviewed
         ↓
 Archived
 ```
+
+Statuses tracked today: `extractionStatus` and `analysisStatus`
+(`pending` | `processing` | `completed` | `failed` | `skipped`).
 
 ---
 
@@ -125,12 +138,15 @@ Capture
       ↓
 ContentDocument
       ↓
-AIAnalysis
+ContentAnalysis (schemaVersion)
       ↓
-Recommendation
+AttentionDecision
       ↓
-UserFeedback
+UserFeedback (later)
 ```
+
+Do not introduce separate Understand / Classify / Enrich / Evaluate tables until
+AI-Architecture.md’s “future expansion” criteria are met.
 
 ---
 
@@ -139,8 +155,10 @@ UserFeedback
 - Treat AI as a pipeline, not as a feature.
 - Normalize content before AI analysis.
 - Keep AI concerns separate from capture management.
-- Store structured AI output.
-- Make every stage independently replaceable.
+- Store structured, versioned AI output.
+- Keep the provider contract thin (`complete`) until call shapes diverge.
+- Prefer improving extractors before adding more AI stages.
+- Local LLM is an optional provider experiment, not a required runtime.
 
 ---
 
@@ -154,3 +172,4 @@ This architecture supports:
 - Personalized recommendations
 - Knowledge graph
 - Learning companion
+- On-device Local LLM provider (`@capacitor/local-llm`) behind availability checks

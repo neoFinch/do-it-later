@@ -3,7 +3,7 @@ import { buildAnalysisPrompt } from './prompt-builder';
 import { ContentDocument } from '../../types/content-document';
 
 describe('prompt-builder', () => {
-  it('builds decision-focused prompt from note content', () => {
+  it('builds multi-lens decision-focused prompt from note content', () => {
     const document: ContentDocument = {
       captureId: 'note-1',
       source: 'note',
@@ -13,16 +13,19 @@ describe('prompt-builder', () => {
     };
 
     const prompt = buildAnalysisPrompt(document);
-    expect(prompt.system).toContain('decide whether saved content is worth their limited time');
-    expect(prompt.system).toContain('Do NOT output star ratings');
-    expect(prompt.user).toContain('expectedLearning');
+    expect(prompt.system).toContain('decide whether saved content deserves');
+    expect(prompt.system).toContain('Do NOT force a software/learning lens');
+    expect(prompt.system).toContain('Technology lens');
+    expect(prompt.system).toContain('Movie / entertainment lens');
+    expect(prompt.user).toContain('expectedValue');
     expect(prompt.user).toContain('potentialDisappointment');
-    expect(prompt.user).toContain('viewerExpectation');
+    expect(prompt.user).toContain('youWillGet');
+    expect(prompt.user).toContain('"lens"');
     expect(prompt.user).toContain('OAuth notes');
     expect(prompt.user).toContain('Estimated reading minutes');
   });
 
-  it('builds prompt from youtube transcript', () => {
+  it('builds compact prompt for on-device models', () => {
     const document: ContentDocument = {
       captureId: 'yt-1',
       source: 'youtube',
@@ -32,7 +35,8 @@ describe('prompt-builder', () => {
       extractedAt: Date.now()
     };
 
-    const prompt = buildAnalysisPrompt(document);
+    const prompt = buildAnalysisPrompt(document, { compact: true });
+    expect(prompt.user).toContain('Keep lensFields small');
     expect(prompt.user).toContain('Redis internals');
     expect(prompt.user).toContain('Estimated watch minutes');
   });

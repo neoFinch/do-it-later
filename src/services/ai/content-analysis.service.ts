@@ -2,8 +2,17 @@ import { AIAnalysis } from '../../types/ai-analysis';
 import { ContentDocument } from '../../types/content-document';
 import { getAiAnalysis } from '../../database/ai-analysis.repository';
 import { buildAnalysisPrompt } from './prompt-builder';
-import { getActiveProvider } from './provider-registry';
+import { getActiveProvider, getFallbackProvider } from './provider-registry';
 import { parseAnalysisResponse } from './response-parser';
+import { AIProvider } from './ai-provider.types';
+
+const completeWithProvider = async (
+  provider: AIProvider,
+  document: ContentDocument
+): Promise<string> => {
+  const prompt = buildAnalysisPrompt(document, { compact: provider.id === 'local-llm' });
+  return provider.complete(prompt);
+};
 
 export const analyze = async (
   document: ContentDocument,
@@ -16,14 +25,28 @@ export const analyze = async (
     }
   }
 
-  const provider = getActiveProvider();
-  if (!provider.isAvailable()) {
+  const primary = getActiveProvider();
+  const fallback = getFallbackProvider(primary.id === 'null' ? undefined : primary.id);
+
+  if (!primary.isAvailable() && !fallback) {
     throw new Error('No AI provider is configured.');
   }
 
-  const prompt = buildAnalysisPrompt(document);
-  const raw = await provider.complete(prompt);
-  return parseAnalysisResponse(document.captureId, raw, document);
+  const provider = primary.isAvailable() ? primary : fallback!;
+
+  try {
+    const raw = await completeWithProvider(provider, document);
+    return parseAnalysisResponse(document.captureId, raw, document);
+  } catch (error) {
+    if (provider.id === 'local-llm' || provider.id === primary.id) {
+      const next = getFallbackProvider(provider.id);
+      if (next) {
+        const raw = await completeWithProvider(next, document);
+        return parseAnalysisResponse(document.captureId, raw, document);
+      }
+    }
+    throw error;
+  }
 };
 
 /** @deprecated Use `analyze` instead. */

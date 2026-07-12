@@ -134,36 +134,44 @@ Teach the application what every capture actually contains.
 
 ## Why
 
-Before AI can recommend anything, it must first understand the content.
+Before AI can help decide attention, it must first understand the content.
+Extracted `ContentDocument` is durable; analysis is a versioned schema that
+can evolve (see [AI-Architecture.md](./AI-Architecture.md)).
 
 ## Features
 
 For every captured item:
 
--   Extract article text
--   Extract YouTube transcript
--   Analyze with AI
+-   Extract article text / YouTube transcript into `ContentDocument`
+-   One structured AI analysis pass (`ContentAnalysis`, schema-versioned)
+-   Pluggable providers: OpenAI, Ollama (default path)
 
-Store structured metadata:
+Store structured metadata (lean triage set; fields may version):
 
 ``` ts
+schemaVersion: number
+lens: "technology" | "science" | "health" | "art" | "movie" | ... | "general"
 topics: string[]
-difficulty: "beginner" | "intermediate" | "advanced"
 targetAudience: string[]
-estimatedReadingTime: number
-estimatedWatchTime: number
-containsCode: boolean
-containsHandsOn: boolean
+estimatedReadingTime: number | null
+estimatedWatchTime: number | null
 contentType: string
 summary: string
-keyTakeaways: string[]
+viewerExpectation: { youWillGet: string[]; youWillNotGet: string[] }
+expectedValue: "low" | "medium" | "high"
+lensFields: object  // domain pack (tech: hands-on; movie: genre; health: ...)
+recommendation: string
 reasoning: string
+confidence: number
 ```
+
+Analysis must **not** force every capture through a software-learning lens.
+Detect a lens, then apply that pack’s criteria and fields.
 
 ## Version Outcome
 
 The application understands every saved item instead of treating it as
-just another URL.
+just another URL — without locking into multi-stage AI storage yet.
 
 ------------------------------------------------------------------------
 
@@ -175,16 +183,15 @@ Help users decide whether a piece of content deserves their attention.
 
 ## Features
 
-For every capture:
+For every capture, derive an **Attention Decision** from analysis
+(deterministic, **lens-aware** scorecard preferred):
 
--   Worth Reading Score
--   Read Now
--   Read Later
--   Skip Recommendation
--   Estimated Value
+-   Worth Your Time Score
+-   Read Now / Read Later / Skip
 -   Estimated Effort
--   Learning Outcome
--   AI Reasoning
+-   Expectation framing (you will / won't get — not always “learn”)
+-   Lens-specific highlights (e.g. hands-on for tech, genre for movies)
+-   Clear reasoning
 
 Example:
 
@@ -215,6 +222,26 @@ Users stop asking:
 and begin asking:
 
 > "What should I read today?"
+
+------------------------------------------------------------------------
+
+# V2.1a --- On-device Local LLM (experimental)
+
+## Goal
+
+Explore `@capacitor/local-llm` as an optional provider on top of the same
+analysis contract — not a replacement for OpenAI/Ollama.
+
+## Scope
+
+-   Availability / download UX (`systemAvailability`, Android download)
+-   Short tasks only when available (topics, one-line summary)
+-   Hard fallback to cloud/Ollama for full analysis, web, and unsupported devices
+
+## Non-goals
+
+-   Not the default inference path
+-   Not required for V2.0 / V2.1 triage to ship
 
 ------------------------------------------------------------------------
 
