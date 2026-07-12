@@ -115,6 +115,10 @@ const AttentionScorecard: React.FC<AttentionScorecardProps> = ({
             <div className="attention-scorecard__details">
               <div className="attention-scorecard__grid">
                 <div className="attention-scorecard__metric">
+                  <p className="attention-scorecard__metric-label">Lens</p>
+                  <p className="attention-scorecard__value">{scorecard.lensLabel}</p>
+                </div>
+                <div className="attention-scorecard__metric">
                   <p className="attention-scorecard__metric-label">Confidence</p>
                   <p className="attention-scorecard__value">{scorecard.confidencePercent}%</p>
                 </div>
@@ -124,21 +128,19 @@ const AttentionScorecard: React.FC<AttentionScorecardProps> = ({
                     {scorecard.estimatedTimeMinutes ? `${scorecard.estimatedTimeMinutes} min` : 'Unknown'}
                   </p>
                 </div>
+                {scorecard.highlightMetrics.map((metric) => (
+                  <div className="attention-scorecard__metric" key={metric.label}>
+                    <p className="attention-scorecard__metric-label">{metric.label}</p>
+                    <p className="attention-scorecard__value">{metric.value}</p>
+                  </div>
+                ))}
                 <div className="attention-scorecard__metric">
-                  <p className="attention-scorecard__metric-label">Learning style</p>
-                  <p className="attention-scorecard__value">{scorecard.learningStyleLabel}</p>
-                </div>
-                <div className="attention-scorecard__metric">
-                  <p className="attention-scorecard__metric-label">Implementation</p>
-                  <p className="attention-scorecard__value">{scorecard.implementationLevelLabel}</p>
-                </div>
-                <div className="attention-scorecard__metric">
-                  <p className="attention-scorecard__metric-label">Expected learning</p>
+                  <p className="attention-scorecard__metric-label">Expected value</p>
                   <p
                     className="attention-scorecard__stars attention-scorecard__stars--compact"
-                    aria-label={`${scorecard.expectedLearningStars} out of 5 stars`}
+                    aria-label={`${scorecard.expectedValueStars} out of 5 stars`}
                   >
-                    {renderStars(scorecard.expectedLearningStars)}
+                    {renderStars(scorecard.expectedValueStars)}
                   </p>
                 </div>
                 <div className="attention-scorecard__metric">

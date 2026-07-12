@@ -29,13 +29,33 @@ import {
 } from '../services/backup.service';
 import { DEFAULT_AI_CONFIG, getAiConfig, saveAiConfig } from '../services/ai/ai-config.service';
 import { OLLAMA_DEFAULT_MODEL } from '../services/ai/providers/ollama.provider';
+import {
+  downloadLocalLlmModel,
+  getCachedLocalLlmAvailability,
+  refreshLocalLlmAvailability
+} from '../services/ai/providers/local-llm.provider';
 import { listProviders } from '../services/ai/provider-registry';
-import { ProviderId } from '../services/ai/ai-provider.types';
+import { LocalLlmAvailability, ProviderId } from '../services/ai/ai-provider.types';
 import { seedMockCaptures } from '../services/seed.service';
 import { processStaleCaptures } from '../services/processing.service';
 import { useCaptureStore } from '../store/captureStore';
 import { getActiveTheme, saveTheme } from '../services/theme.service';
 import './SettingsPage.css';
+
+const localLlmStatusLabel = (status: LocalLlmAvailability): string => {
+  switch (status) {
+    case 'available':
+      return 'Ready on this device';
+    case 'downloadable':
+      return 'Model can be downloaded';
+    case 'notready':
+      return 'Model is downloading or initializing';
+    case 'unavailable':
+      return 'Not available on this device / platform';
+    default:
+      return 'Checking availability…';
+  }
+};
 
 const SettingsPage: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -48,6 +68,9 @@ const SettingsPage: React.FC = () => {
   const [autoAnalyze, setAutoAnalyze] = useState(() => getAiConfig().autoAnalyze);
   const [darkMode, setDarkMode] = useState(() => getActiveTheme() === 'dark');
   const [replaceSampleData, setReplaceSampleData] = useState(false);
+  const [localLlmStatus, setLocalLlmStatus] = useState<LocalLlmAvailability>(() =>
+    getCachedLocalLlmAvailability()
+  );
   const { reload, repairDatabase } = useCaptureStore();
   const providers = listProviders();
   const aiSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -93,6 +116,34 @@ const SettingsPage: React.FC = () => {
       }
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void refreshLocalLlmAvailability().then((status) => {
+      if (!cancelled) {
+        setLocalLlmStatus(status);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleDownloadLocalLlm = async () => {
+    setBusy(true);
+    try {
+      await downloadLocalLlmModel();
+      const status = await refreshLocalLlmAvailability();
+      setLocalLlmStatus(status);
+      setToastMessage(
+        status === 'available' ? 'On-device model ready.' : `On-device model status: ${status}`
+      );
+    } catch (error) {
+      setToastMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const handleExport = async () => {
     setBusy(true);
@@ -247,7 +298,9 @@ const SettingsPage: React.FC = () => {
         <section className="settings-section">
           <h2 className="settings-section__title">AI understanding</h2>
           <p className="settings-section__desc">
-            Extract and analyze captures through a pluggable AI provider. Changes save automatically.
+            Extract and analyze captures through a pluggable AI provider. OpenAI and Ollama are the
+            default path; on-device Local LLM is experimental and falls back when unavailable.
+            Changes save automatically.
           </p>
           <IonList className="settings-section__list" lines="full">
             <IonItem>
@@ -260,6 +313,9 @@ const SettingsPage: React.FC = () => {
                   const next = event.detail.value as ProviderId;
                   setProviderId(next);
                   scheduleAiSave({ providerId: next });
+                  if (next === 'local-llm') {
+                    void refreshLocalLlmAvailability().then(setLocalLlmStatus);
+                  }
                 }}
               >
                 {providers.map((provider) => (
@@ -285,19 +341,21 @@ const SettingsPage: React.FC = () => {
                 />
               </IonItem>
             )}
-            <IonItem>
-              <IonInput
-                label="Model"
-                labelPlacement="stacked"
-                value={model}
-                placeholder={providerId === 'ollama' ? OLLAMA_DEFAULT_MODEL : DEFAULT_AI_CONFIG.model}
-                onIonInput={(event) => {
-                  const next = event.detail.value ?? '';
-                  setModel(next);
-                  scheduleAiSave({ model: next });
-                }}
-              />
-            </IonItem>
+            {providerId !== 'local-llm' && (
+              <IonItem>
+                <IonInput
+                  label="Model"
+                  labelPlacement="stacked"
+                  value={model}
+                  placeholder={providerId === 'ollama' ? OLLAMA_DEFAULT_MODEL : DEFAULT_AI_CONFIG.model}
+                  onIonInput={(event) => {
+                    const next = event.detail.value ?? '';
+                    setModel(next);
+                    scheduleAiSave({ model: next });
+                  }}
+                />
+              </IonItem>
+            )}
             {providerId === 'ollama' && (
               <IonItem>
                 <IonInput
@@ -313,6 +371,14 @@ const SettingsPage: React.FC = () => {
                 />
               </IonItem>
             )}
+            {providerId === 'local-llm' && (
+              <IonItem lines="none">
+                <IonLabel className="ion-text-wrap">
+                  <h3>On-device status</h3>
+                  <p>{localLlmStatusLabel(localLlmStatus)}</p>
+                </IonLabel>
+              </IonItem>
+            )}
             <IonItem lines="none">
               <IonLabel>Analyze new captures automatically</IonLabel>
               <IonToggle
@@ -322,6 +388,17 @@ const SettingsPage: React.FC = () => {
               />
             </IonItem>
           </IonList>
+          {providerId === 'local-llm' && localLlmStatus === 'downloadable' && (
+            <IonButton
+              fill="clear"
+              color="medium"
+              className="settings-link-button"
+              disabled={busy}
+              onClick={() => void handleDownloadLocalLlm()}
+            >
+              Download on-device model
+            </IonButton>
+          )}
           {providerId === 'openai' && apiKey && (
             <IonButton
               fill="clear"

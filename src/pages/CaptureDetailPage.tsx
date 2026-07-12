@@ -312,6 +312,7 @@ const CaptureDetailPage: React.FC = () => {
 
           {showUnderstanding && (
             <>
+              {/* TODO(product): maybe hide Extracted content from end users — see CaptureExtractedContent.tsx */}
               <CaptureExtractedContent
                 processing={processing}
                 document={document}
@@ -326,8 +327,8 @@ const CaptureDetailPage: React.FC = () => {
               />
               {analysis && (
                 <CaptureLearningExpectations
-                  youWillLearn={analysis.viewerExpectation.youWillLearn}
-                  youWillNotLearn={analysis.viewerExpectation.youWillNotLearn}
+                  youWillGet={analysis.viewerExpectation.youWillGet}
+                  youWillNotGet={analysis.viewerExpectation.youWillNotGet}
                 />
               )}
             </>

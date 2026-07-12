@@ -39,16 +39,20 @@ The real problem is deciding **what deserves attention**.
 ```text
 Capture
     ↓
-Understand
+Extract (ContentDocument)
     ↓
-Evaluate
+Analyze (structured metadata)
     ↓
-Recommend
+Decide (Read now / Later / Skip)
     ↓
-Learn
+Learn from feedback
 ```
 
 Instead of asking *What did I save?*, users ask *What should I spend my time on today?*
+
+Technical detail lives in [AI-Architecture.md](./AI-Architecture.md): durable
+extracted content, one versioned analysis pass, then an attention decision.
+Analysis representation can pivot (triage, organize, recall) without re-saving.
 
 ---
 
@@ -87,9 +91,11 @@ Measure success by **Attention Saved**, not content collected.
 ```text
 Capture
       ↓
-Understanding
+Content
       ↓
-Recommendation
+Analysis
+      ↓
+Decision
       ↓
 Knowledge
 ```

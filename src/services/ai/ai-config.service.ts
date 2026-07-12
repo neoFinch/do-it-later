@@ -20,7 +20,7 @@ export const DEFAULT_AI_CONFIG: AiConfig = {
   autoAnalyze: true
 };
 
-const VALID_PROVIDER_IDS: ProviderId[] = ['null', 'openai', 'ollama'];
+const VALID_PROVIDER_IDS: ProviderId[] = ['null', 'openai', 'ollama', 'local-llm'];
 
 const normalizeProviderId = (value: unknown): ProviderId => {
   if (typeof value === 'string' && VALID_PROVIDER_IDS.includes(value as ProviderId)) {

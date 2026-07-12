@@ -3,8 +3,10 @@ import { pickThumbnailUrl } from './thumbnail.service';
 
 export interface UrlMetadata {
   title?: string;
+  description?: string;
   thumbnail?: string;
   source?: string;
+  author?: string;
 }
 
 /** Instagram serves og:image to this UA; desktop Chrome gets a login shell without images. */
@@ -76,12 +78,24 @@ export const parseOpenGraphMetadata = (html: string, pageUrl?: string): UrlMetad
       ? decodeHtmlEntities(thumbnailRaw)
       : undefined;
 
+  const description =
+    getMetaContent(html, 'og:description') ??
+    getMetaContent(html, 'twitter:description', 'name') ??
+    getMetaContent(html, 'description', 'name') ??
+    undefined;
+
   const source = getMetaContent(html, 'og:site_name') ?? undefined;
+  const author =
+    getMetaContent(html, 'author', 'name') ??
+    getMetaContent(html, 'article:author') ??
+    undefined;
 
   return {
     title: title ? decodeHtmlEntities(title) : undefined,
+    description: description ? decodeHtmlEntities(description) : undefined,
     thumbnail,
-    source
+    source,
+    author: author ? decodeHtmlEntities(author) : undefined
   };
 };
 

@@ -11,7 +11,21 @@ describe('provider-registry', () => {
     const ids = listProviders().map((provider) => provider.id);
     expect(ids).toContain('openai');
     expect(ids).toContain('ollama');
+    expect(ids).toContain('local-llm');
     expect(ids).not.toContain('gemini');
+  });
+
+  it('keeps local-llm unavailable on web until native availability refresh', () => {
+    saveAiConfig({
+      providerId: 'local-llm',
+      apiKey: '',
+      model: 'on-device',
+      baseUrl: '',
+      autoAnalyze: true
+    });
+
+    expect(getProvider('local-llm').isAvailable()).toBe(false);
+    expect(getActiveProvider().id).toBe('null');
   });
 
   it('returns null provider when openai is not configured', () => {

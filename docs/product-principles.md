@@ -39,7 +39,8 @@ The application should answer:
 -   Should I postpone it?
 -   Should I ignore it?
 
-Decision-making comes before summaries.
+Decision-making is the primary product surface. Structured summaries and
+metadata exist to support that decision — not as an end in themselves.
 
 ------------------------------------------------------------------------
 
@@ -71,6 +72,10 @@ Examples include:
 -   Target audience
 -   Learning outcomes
 -   Prerequisites
+
+Structured fields should match the **content lens** (technology, health,
+movies, art, etc.). Do not force every capture through a software-learning
+schema.
 
 Structured information enables better search, recommendations and future
 features.
@@ -113,8 +118,11 @@ assumptions.
 
 A saved URL should evolve into knowledge.
 
-Capture → Understanding → Evaluation → Recommendation → Learning →
+Capture → ContentDocument → Analysis → Decision → Learning →
 Connected Knowledge
+
+Extracted content is durable. How we analyze and represent it can change as
+the product learns what users need.
 
 The value of a capture should increase as the system learns more about
 it and about the user.

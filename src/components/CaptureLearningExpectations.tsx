@@ -1,36 +1,36 @@
 import { FC } from 'react';
 
 interface CaptureLearningExpectationsProps {
-  youWillLearn: string[];
-  youWillNotLearn: string[];
+  youWillGet: string[];
+  youWillNotGet: string[];
 }
 
 const CaptureLearningExpectations: FC<CaptureLearningExpectationsProps> = ({
-  youWillLearn,
-  youWillNotLearn
+  youWillGet,
+  youWillNotGet
 }) => {
-  if (youWillLearn.length === 0 && youWillNotLearn.length === 0) {
+  if (youWillGet.length === 0 && youWillNotGet.length === 0) {
     return null;
   }
 
   return (
     <section className="capture-detail__section capture-learning">
-      {youWillLearn.length > 0 && (
+      {youWillGet.length > 0 && (
         <div className="capture-learning__block">
-          <h2 className="capture-learning__heading">You&apos;ll learn</h2>
+          <h2 className="capture-learning__heading">You&apos;ll get</h2>
           <ul className="capture-learning__list capture-learning__list--positive">
-            {youWillLearn.map((item) => (
+            {youWillGet.map((item) => (
               <li key={item}>{item}</li>
             ))}
           </ul>
         </div>
       )}
 
-      {youWillNotLearn.length > 0 && (
+      {youWillNotGet.length > 0 && (
         <div className="capture-learning__block">
-          <h2 className="capture-learning__heading">You won&apos;t learn</h2>
+          <h2 className="capture-learning__heading">You won&apos;t get</h2>
           <ul className="capture-learning__list capture-learning__list--negative">
-            {youWillNotLearn.map((item) => (
+            {youWillNotGet.map((item) => (
               <li key={item}>{item}</li>
             ))}
           </ul>

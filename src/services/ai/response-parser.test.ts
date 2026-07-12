@@ -1,64 +1,86 @@
 import { describe, expect, it } from 'vitest';
-import { parseAnalysisResponse } from './response-parser';
+import { CURRENT_ANALYSIS_SCHEMA_VERSION } from '../../types/ai-analysis';
 import { ContentDocument } from '../../types/content-document';
+import { parseAnalysisResponse } from './response-parser';
+
+const document: ContentDocument = {
+  captureId: 'c1',
+  source: 'article',
+  articleText: 'Sample article text for analysis.',
+  extractedAt: Date.now()
+};
 
 describe('response-parser', () => {
-  const document: ContentDocument = {
-    captureId: 'capture-1',
-    source: 'article',
-    articleText: 'word '.repeat(440),
-    extractedAt: Date.now()
-  };
-
-  it('normalizes structured AI output', () => {
+  it('parses multi-lens analysis JSON', () => {
     const analysis = parseAnalysisResponse(
-      'capture-1',
+      'c1',
       JSON.stringify({
-        implementationLevel: 'low',
-        learningStyle: 'mixed',
-        codeWalkthrough: true,
-        expectedLearning: 'high',
-        potentialDisappointment: 'medium',
+        lens: 'technology',
+        summary: 'Redis memory overview',
+        topics: ['redis', 'memory'],
+        contentType: 'deep-dive',
+        expectedValue: 'high',
+        potentialDisappointment: 'low',
         viewerExpectation: {
-          youWillLearn: ['Why eviction policies matter'],
-          youWillNotLearn: ['Live coding', 'Build-along exercises']
+          youWillGet: ['Why eviction policies matter'],
+          youWillNotGet: ['Production tuning playbook']
         },
-        recommendation: 'Worth reading for conceptual understanding.',
-        estimatedReadingTime: 18,
-        estimatedWatchTime: null,
-        confidence: 1.4
+        lensFields: {
+          implementationLevel: 'low',
+          learningStyle: 'mixed',
+          codeWalkthrough: true
+        },
+        recommendation: 'Read later',
+        reasoning: 'Useful concepts, limited hands-on',
+        confidence: 0.8
       }),
       document
     );
 
-    expect(analysis.captureId).toBe('capture-1');
-    expect(analysis.implementationLevel).toBe('low');
-    expect(analysis.expectedLearning).toBe('high');
-    expect(analysis.potentialDisappointment).toBe('medium');
-    expect(analysis.recommendation).toBe('Worth reading for conceptual understanding.');
-    expect(analysis.viewerExpectation.youWillLearn).toEqual(['Why eviction policies matter']);
-    expect(analysis.estimatedReadingTime).toBe(18);
+    expect(analysis.schemaVersion).toBe(CURRENT_ANALYSIS_SCHEMA_VERSION);
+    expect(analysis.lens).toBe('technology');
+    expect(analysis.expectedValue).toBe('high');
+    expect(analysis.viewerExpectation.youWillGet).toEqual(['Why eviction policies matter']);
+    expect(analysis.lensFields.implementationLevel).toBe('low');
+    expect(analysis.lensFields.codeWalkthrough).toBe(true);
+  });
+
+  it('accepts legacy field names and defaults invalid values', () => {
+    const analysis = parseAnalysisResponse(
+      'c1',
+      JSON.stringify({
+        lens: 'invalid',
+        expectedLearning: 'high',
+        viewerExpectation: {
+          youWillLearn: ['A'],
+          youWillNotLearn: ['B']
+        },
+        implementationLevel: 'medium',
+        confidence: 2
+      }),
+      document
+    );
+
+    expect(analysis.lens).toBe('general');
+    expect(analysis.expectedValue).toBe('high');
+    expect(analysis.viewerExpectation).toEqual({ youWillGet: ['A'], youWillNotGet: ['B'] });
     expect(analysis.confidence).toBe(1);
   });
 
-  it('falls back to heuristic time estimates and defaults', () => {
+  it('parses movie lens fields', () => {
     const analysis = parseAnalysisResponse(
-      'capture-2',
+      'c1',
       JSON.stringify({
-        implementationLevel: 'invalid',
-        learningStyle: 'invalid',
-        summary: 'Short summary',
-        confidence: 'bad'
+        lens: 'movie',
+        expectedValue: 'medium',
+        viewerExpectation: { youWillGet: ['A tense thriller'], youWillNotGet: ['Spoilers'] },
+        lensFields: { genre: 'thriller', spoilerRisk: 'high' },
+        confidence: 0.7
       }),
       document
     );
 
-    expect(analysis.implementationLevel).toBe('none');
-    expect(analysis.learningStyle).toBe('conceptual');
-    expect(analysis.expectedLearning).toBe('medium');
-    expect(analysis.potentialDisappointment).toBe('medium');
-    expect(analysis.viewerExpectation).toEqual({ youWillLearn: [], youWillNotLearn: [] });
-    expect(analysis.estimatedReadingTime).toBe(2);
-    expect(analysis.confidence).toBe(0.5);
+    expect(analysis.lens).toBe('movie');
+    expect(analysis.lensFields.genre).toBe('thriller');
   });
 });

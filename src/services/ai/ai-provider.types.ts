@@ -3,7 +3,9 @@ export interface AnalysisPrompt {
   user: string;
 }
 
-export type ProviderId = 'null' | 'openai' | 'ollama';
+export type ProviderId = 'null' | 'openai' | 'ollama' | 'local-llm';
+
+export type LocalLlmAvailability = 'available' | 'unavailable' | 'notready' | 'downloadable' | 'unknown';
 
 export interface AIProvider {
   readonly id: ProviderId;
