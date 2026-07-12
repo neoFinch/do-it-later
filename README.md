@@ -15,11 +15,11 @@ Parked and upcoming work. Order is approximate, not a commitment.
 ### Near-term / parked
 
 - [ ] **Re-render issue when metadata is fetched** — UI flickers or re-renders when capture metadata/thumbnails load after save
-- [ ] **Instagram / share metadata failures** — thumbnail or extracted content sometimes missing on share (network, login wall, or timing); need reliable re-fetch from capture detail with a clear message when extraction still cannot be done (partial retry exists today; improve UX for missing image + empty body)
+- [x] **Instagram / share metadata failures** — thumbnail or extracted content sometimes missing on share (network, login wall, or timing); re-fetch from capture detail (metadata + extraction) with clear Try again messaging when it still fails
 - [ ] **Hide Extracted content from end users** — keep extraction for AI; detail screen may not need the raw transcript/article preview (`TODO` in `CaptureExtractedContent.tsx`)
 - [ ] **Manual lens override** — let the user change technology / movie / health / etc. and re-analyze
 - [ ] **File capture extraction** — currently skipped (“not supported yet”)
-- [ ] **Instagram / social extraction polish** — more chrome edge cases beyond the first cleanup pass; handle empty OG / blocked fetches gracefully
+- [ ] **Instagram / social extraction polish** — more chrome edge cases beyond the first cleanup pass; handle empty OG / blocked fetches gracefully _(partial: login-wall detection + retry messaging)_
 - [ ] **Local LLM hardening** — still experimental; works only on Gemini Nano / Apple Intelligence–capable devices; improve status UX and when to fall back
 - [ ] **App icon & splash screen** — proper branding assets for install / launch (currently missing)
 

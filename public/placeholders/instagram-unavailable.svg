@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="560" viewBox="0 0 800 560" role="img" aria-label="Preview unavailable">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#FFE8D6"/>
+      <stop offset="45%" stop-color="#FFD6E8"/>
+      <stop offset="100%" stop-color="#D6E8FF"/>
+    </linearGradient>
+    <linearGradient id="orb" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#FF8A65"/>
+      <stop offset="50%" stop-color="#F06292"/>
+      <stop offset="100%" stop-color="#7E57C2"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="560" fill="url(#sky)"/>
+  <circle cx="640" cy="120" r="90" fill="#FFF6E8" opacity="0.85"/>
+  <circle cx="120" cy="420" r="110" fill="#E8F4FF" opacity="0.9"/>
+  <g transform="translate(250 145)">
+    <rect x="20" y="40" width="260" height="200" rx="36" fill="url(#orb)"/>
+    <rect x="42" y="62" width="216" height="156" rx="24" fill="#1A1A1A" opacity="0.18"/>
+    <circle cx="150" cy="140" r="54" fill="#FFF8F0" opacity="0.95"/>
+    <circle cx="150" cy="140" r="28" fill="#1A1A1A" opacity="0.35"/>
+    <circle cx="232" cy="78" r="14" fill="#FFF8F0" opacity="0.9"/>
+    <path d="M78 40 C78 18 110 8 150 8 C190 8 222 18 222 40" fill="none" stroke="#1A1A1A" stroke-opacity="0.2" stroke-width="10" stroke-linecap="round"/>
+  </g>
+  <text x="400" y="420" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="28" fill="#3D2C29">Preview tucked away</text>
+  <text x="400" y="458" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="16" fill="#6B534E">Open the link to view it on Instagram</text>
+</svg>

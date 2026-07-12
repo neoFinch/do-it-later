@@ -12,7 +12,12 @@ vi.mock('./extractors/content-extractor.service', () => ({
 
 vi.mock('../database/content-document.repository', () => ({
   getContentDocument: vi.fn(),
-  saveContentDocument: vi.fn()
+  saveContentDocument: vi.fn(),
+  deleteContentDocument: vi.fn()
+}));
+
+vi.mock('../database/ai-analysis.repository', () => ({
+  deleteAiAnalysis: vi.fn()
 }));
 
 vi.mock('../database/processing.repository', () => ({
@@ -22,7 +27,12 @@ vi.mock('../database/processing.repository', () => ({
 
 import { getCapture } from './capture.service';
 import { extractCaptureContent } from './extractors/content-extractor.service';
-import { getContentDocument, saveContentDocument } from '../database/content-document.repository';
+import {
+  deleteContentDocument,
+  getContentDocument,
+  saveContentDocument
+} from '../database/content-document.repository';
+import { deleteAiAnalysis } from '../database/ai-analysis.repository';
 import { getCaptureProcessing, saveCaptureProcessing } from '../database/processing.repository';
 
 describe('extraction.service', () => {
@@ -30,6 +40,8 @@ describe('extraction.service', () => {
     vi.clearAllMocks();
     vi.mocked(getCaptureProcessing).mockResolvedValue(null);
     vi.mocked(saveCaptureProcessing).mockResolvedValue(undefined);
+    vi.mocked(deleteContentDocument).mockResolvedValue(undefined);
+    vi.mocked(deleteAiAnalysis).mockResolvedValue(undefined);
   });
 
   it('skips file captures', async () => {
@@ -85,5 +97,33 @@ describe('extraction.service', () => {
     const result = await extractCapture('note-1');
     expect(saveContentDocument).toHaveBeenCalledWith(document);
     expect(result).toEqual(document);
+  });
+
+  it('clears stale document when extraction fails', async () => {
+    const capture: Capture = {
+      id: 'ig-1',
+      type: 'url',
+      title: 'Reel',
+      content: null,
+      url: 'https://www.instagram.com/reel/abc/',
+      source: null,
+      thumbnail: null,
+      status: 'INBOX',
+      createdAt: Date.now()
+    };
+
+    vi.mocked(getCapture).mockResolvedValue(capture);
+    vi.mocked(getContentDocument).mockResolvedValue({
+      captureId: 'ig-1',
+      source: 'instagram',
+      articleText: 'stale chrome text that should be removed',
+      extractedAt: Date.now()
+    });
+    vi.mocked(extractCaptureContent).mockRejectedValue(new Error('Instagram hid this post from scrapers.'));
+
+    const result = await extractCapture('ig-1', { force: true });
+    expect(result).toBeNull();
+    expect(deleteContentDocument).toHaveBeenCalledWith('ig-1');
+    expect(deleteAiAnalysis).toHaveBeenCalledWith('ig-1');
   });
 });

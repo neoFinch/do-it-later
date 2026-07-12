@@ -104,7 +104,15 @@ export const extractCapture = async (captureId: string, options?: { force?: bool
       return extraction.document;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
+      // Drop stale extracts / analysis so UI does not keep a scorecard for blocked posts.
+      await deleteContentDocument(captureId);
+      const { deleteAiAnalysis } = await import('../database/ai-analysis.repository');
+      await deleteAiAnalysis(captureId);
       await setExtractionStatus(captureId, 'failed', message);
+      await updateProcessing(captureId, {
+        analysisStatus: 'skipped',
+        analysisError: 'Skipped — no usable content to analyze.'
+      });
       return null;
     }
   } finally {

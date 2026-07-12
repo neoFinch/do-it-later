@@ -16,7 +16,7 @@ import {
 import { Capture } from '../types/capture';
 import { useCapturePreview } from '../hooks/useCapturePreview';
 import { isImageMime } from '../services/file.service';
-import { openLink } from '../services/link.service';
+import { openLink, detectLinkPlatform } from '../services/link.service';
 import { getCaptureDisplayTitle } from '../services/title.service';
 import { getCaptureSourceBadge, SourceBadgeVariant } from '../utils/capture-source';
 import { formatRelativeSavedAt } from '../utils/format-date';
@@ -48,6 +48,14 @@ const CaptureListMedia: React.FC<{ capture: Capture }> = ({ capture }) => {
     return (
       <div className="capture-list-item__media">
         <img src={previewUrl} alt="" onError={() => setHidden(true)} />
+      </div>
+    );
+  }
+
+  if (capture.type === 'url' && detectLinkPlatform(capture.url ?? '') === 'instagram') {
+    return (
+      <div className="capture-list-item__media capture-list-item__media--placeholder">
+        <img src="/placeholders/instagram-unavailable.svg" alt="" />
       </div>
     );
   }

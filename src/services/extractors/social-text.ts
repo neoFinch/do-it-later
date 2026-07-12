@@ -33,6 +33,48 @@ export const looksLikeInstagramChrome = (text: string): boolean => {
   return chromeHits >= 2 && text.length < 800;
 };
 
+/** HTML that looks like an Instagram login / signup wall with little real post content. */
+export const looksLikeInstagramLoginWall = (html: string): boolean => {
+  const lower = html.toLowerCase();
+  const wallSignals = [
+    'sign up for instagram',
+    'log in to see',
+    'create an account',
+    'login_form',
+    'never miss a post'
+  ].filter((phrase) => lower.includes(phrase)).length;
+
+  const hasOgDescription = /property=["']og:description["']/i.test(html) || /name=["']description["']/i.test(html);
+  return wallSignals >= 2 && !hasOgDescription;
+};
+
+/**
+ * Instagram served an error / restricted media shell (age gate, unavailable, etc.)
+ * with no Open Graph payload for scrapers.
+ */
+export const looksLikeInstagramRestrictedMedia = (html: string): boolean => {
+  const hasErrorShell =
+    /httpErrorPage/i.test(html) ||
+    /PolarisErrorRoot/i.test(html) ||
+    /show_lox_redesigned_404_page"\s*:\s*true/i.test(html);
+
+  const hasOg =
+    /property=["']og:image["']/i.test(html) ||
+    /property=["']og:description["']/i.test(html) ||
+    /property=["']og:title["']/i.test(html);
+
+  return hasErrorShell && !hasOg;
+};
+
+export const INSTAGRAM_RESTRICTED_MESSAGE =
+  'Instagram hid this post from scrapers (restricted or unavailable). The link still works — open it in Instagram to view the real content.';
+
+export const INSTAGRAM_LOGIN_WALL_MESSAGE =
+  'Instagram blocked this page (login wall). Open the post in Instagram, check your connection, then tap Try again.';
+
+export const INSTAGRAM_EMPTY_EXTRACT_MESSAGE =
+  'Could not extract Instagram caption or preview. This is often a network or login-wall issue — tap Try again in a moment.';
+
 /**
  * Strip Instagram login-wall / profile chrome from extracted text.
  * Prefers content after chrome markers when the scrape concatenated UI + caption.
