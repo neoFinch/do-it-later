@@ -5,7 +5,15 @@ import { getYouTubeThumbnailUrl } from '../thumbnail.service';
 import { fetchPageHtml, parseOpenGraphMetadata } from '../metadata.service';
 import { extractArticleText, estimateReadingMinutes } from './article-text';
 import { hasUsableExtractedContent } from './document-body';
-import { cleanInstagramExtractedText, looksLikeInstagramChrome } from './social-text';
+import {
+  cleanInstagramExtractedText,
+  INSTAGRAM_EMPTY_EXTRACT_MESSAGE,
+  INSTAGRAM_LOGIN_WALL_MESSAGE,
+  INSTAGRAM_RESTRICTED_MESSAGE,
+  looksLikeInstagramChrome,
+  looksLikeInstagramLoginWall,
+  looksLikeInstagramRestrictedMedia
+} from './social-text';
 import { estimateWatchMinutes, extractYouTubeTranscript } from './youtube.extractor';
 
 export interface ExtractionResult {
@@ -80,22 +88,49 @@ export const extractUrlContent = async (capture: Capture): Promise<ExtractionRes
     };
   }
 
-  const html = await fetchPageHtml(url);
+  let html: string;
+  try {
+    html = await fetchPageHtml(url);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (platform === 'instagram') {
+      throw new Error(
+        `${message} Instagram metadata is unreliable — tap Try again when you have a stable connection.`
+      );
+    }
+    throw new Error(`${message} Tap Try again to re-fetch this page.`);
+  }
+
   const metadata = parseOpenGraphMetadata(html, url);
   let articleText = extractArticleText(html);
 
   if (platform === 'instagram') {
+    if (looksLikeInstagramRestrictedMedia(html)) {
+      throw new Error(INSTAGRAM_RESTRICTED_MESSAGE);
+    }
+
+    if (looksLikeInstagramLoginWall(html) && !metadata.description?.trim() && !metadata.thumbnail) {
+      throw new Error(INSTAGRAM_LOGIN_WALL_MESSAGE);
+    }
+
     const metaCaption = metadata.description?.trim() || '';
     const cleanedHtml = articleText ? cleanInstagramExtractedText(articleText) : '';
     const metaLooksClean = metaCaption.length >= 40 && !looksLikeInstagramChrome(metaCaption);
 
     if (metaLooksClean) {
       articleText = metaCaption;
-    } else if (cleanedHtml) {
+    } else if (cleanedHtml && !looksLikeInstagramChrome(cleanedHtml)) {
       articleText = cleanedHtml;
     } else {
       articleText = [metaCaption, capture.title, capture.content].filter(Boolean).join('\n\n').trim();
       articleText = articleText ? cleanInstagramExtractedText(articleText) : '';
+    }
+
+    if (!articleText || looksLikeInstagramChrome(articleText)) {
+      if (!metadata.thumbnail && !metadata.description) {
+        throw new Error(INSTAGRAM_RESTRICTED_MESSAGE);
+      }
+      throw new Error(INSTAGRAM_EMPTY_EXTRACT_MESSAGE);
     }
   } else if (!articleText && (platform === 'twitter' || platform === 'tiktok')) {
     articleText = [metadata.description, metadata.title, capture.title, capture.content]
@@ -123,7 +158,11 @@ export const extractUrlContent = async (capture: Capture): Promise<ExtractionRes
   });
 
   if (!hasUsableExtractedContent(document)) {
-    throw new Error('Could not extract usable page content.');
+    throw new Error(
+      platform === 'instagram'
+        ? 'Could not extract Instagram content. Check your connection and tap Try again.'
+        : 'Could not extract usable page content. Check your connection and tap Try again.'
+    );
   }
 
   return {

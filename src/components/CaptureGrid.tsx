@@ -18,6 +18,7 @@ import { isImageMime } from '../services/file.service';
 import { getCaptureDisplayTitle } from '../services/title.service';
 import { getCaptureSourceBadge, SourceBadgeVariant } from '../utils/capture-source';
 import { formatRelativeSavedAt } from '../utils/format-date';
+import { detectLinkPlatform } from '../services/link.service';
 
 const SOURCE_ICONS: Record<SourceBadgeVariant, string> = {
   youtube: logoYoutube,
@@ -55,6 +56,8 @@ const CaptureGridMedia: React.FC<{ capture: Capture }> = ({ capture }) => {
     <div className="capture-grid__media">
       {previewUrl && !hidden ? (
         <img src={previewUrl} alt="" onError={() => setHidden(true)} />
+      ) : capture.type === 'url' && detectLinkPlatform(capture.url ?? '') === 'instagram' ? (
+        <img src="/placeholders/instagram-unavailable.svg" alt="" />
       ) : (
         <IonIcon icon={fallbackIcon} />
       )}

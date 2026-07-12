@@ -107,49 +107,89 @@ export const refreshInboxIfInitialized = (): void => {
   scheduleInboxRefresh();
 };
 
+export interface EnrichUrlResult {
+  updated: boolean;
+  thumbnail: string | null;
+  title: string | null;
+  error: string | null;
+}
+
 export const enrichUrlCapture = async (
   id: string,
   url: string,
-  existingTitle?: string | null
-): Promise<void> => {
+  existingTitle?: string | null,
+  options?: { force?: boolean }
+): Promise<EnrichUrlResult> => {
+  const force = options?.force === true;
+  const existing = await repository.getCaptureById(id);
+
   try {
-    const metadata = await fetchUrlMetadata(url);
+    const metadata = (await fetchUrlMetadata(url)) ?? {};
     const updates: Partial<Omit<Capture, 'id' | 'createdAt'>> = {};
 
     const thumbnail = pickThumbnailUrl(url, [metadata.thumbnail]);
-    if (thumbnail) {
+    if (thumbnail && (force || !existing?.thumbnail || thumbnail !== existing.thumbnail)) {
       updates.thumbnail = thumbnail;
     }
     if (metadata.source) {
       updates.source = metadata.source;
     }
-    if (metadata.title && (shouldReplaceTitle(existingTitle, url) || isDirtyShareTitle(existingTitle, url))) {
+    if (
+      metadata.title &&
+      (shouldReplaceTitle(existingTitle, url) ||
+        isDirtyShareTitle(existingTitle, url) ||
+        (force && !existingTitle?.trim()))
+    ) {
       updates.title = cleanTitle(metadata.title);
     } else if (existingTitle && isDirtyShareTitle(existingTitle, url)) {
       updates.title = cleanTitle(existingTitle);
     }
 
     if (Object.keys(updates).length === 0) {
-      return;
+      return {
+        updated: false,
+        thumbnail: existing?.thumbnail ?? thumbnail ?? null,
+        title: existing?.title ?? null,
+        error:
+          force && !thumbnail
+            ? 'Instagram (or this site) hid the preview image from scrapers. Your link is still saved — open it to view the content.'
+            : null
+      };
     }
 
     await updateCapture(id, updates);
     refreshInboxIfInitialized();
+
+    const refreshed = await repository.getCaptureById(id);
+    return {
+      updated: true,
+      thumbnail: refreshed?.thumbnail ?? thumbnail ?? null,
+      title: refreshed?.title ?? null,
+      error: null
+    };
   } catch (error) {
     console.warn('Failed to enrich capture metadata', { id, url, error });
 
     const fallbackThumbnail = resolveThumbnailForUrl(url);
-    if (!fallbackThumbnail) {
-      return;
+    const message = error instanceof Error ? error.message : String(error);
+
+    if (fallbackThumbnail && (force || !existing?.thumbnail)) {
+      await updateCapture(id, { thumbnail: fallbackThumbnail });
+      refreshInboxIfInitialized();
+      return {
+        updated: true,
+        thumbnail: fallbackThumbnail,
+        title: existing?.title ?? null,
+        error: null
+      };
     }
 
-    const existing = await repository.getCaptureById(id);
-    if (existing?.thumbnail) {
-      return;
-    }
-
-    await updateCapture(id, { thumbnail: fallbackThumbnail });
-    refreshInboxIfInitialized();
+    return {
+      updated: false,
+      thumbnail: existing?.thumbnail ?? null,
+      title: existing?.title ?? null,
+      error: message
+    };
   }
 };
 

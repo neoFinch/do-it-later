@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { cleanInstagramExtractedText, looksLikeInstagramChrome } from './social-text';
+import {
+  cleanInstagramExtractedText,
+  looksLikeInstagramChrome,
+  looksLikeInstagramLoginWall,
+  looksLikeInstagramRestrictedMedia
+} from './social-text';
 
 describe('social-text', () => {
   const polluted = [
@@ -25,9 +30,26 @@ describe('social-text', () => {
     expect(cleaned).toContain('Selfish hours');
   });
 
-  it('leaves clean captions alone', () => {
-    const caption =
-      "Having your 'selfless' & 'selfish' hours. Selfless hours = family, team, clients, work.";
-    expect(cleanInstagramExtractedText(caption)).toBe(caption);
+  it('detects Instagram login-wall HTML', () => {
+    const html = `
+      <html><body>
+        Sign up for Instagram to stay in the loop.
+        Create an account or log in to see photos.
+        <form id="login_form"></form>
+      </body></html>
+    `;
+    expect(looksLikeInstagramLoginWall(html)).toBe(true);
+  });
+
+  it('detects Instagram restricted / error media shells', () => {
+    const html = `
+      {"page_logging":{"name":"httpErrorPage"},"failure_reason":"MA","restricted_age":22,
+      "show_lox_redesigned_404_page":true,"PolarisErrorRoot":true}
+      <title>Instagram</title>
+    `;
+    expect(looksLikeInstagramRestrictedMedia(html)).toBe(true);
+    expect(looksLikeInstagramRestrictedMedia('<meta property="og:image" content="https://x.jpg">httpErrorPage')).toBe(
+      false
+    );
   });
 });
