@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import { IonIcon } from '@ionic/react';
 import {
   documentOutline,
@@ -17,6 +17,7 @@ import { useCapturePreview } from '../hooks/useCapturePreview';
 import { isImageMime } from '../services/file.service';
 import { getCaptureDisplayTitle } from '../services/title.service';
 import { getCaptureSourceBadge, SourceBadgeVariant } from '../utils/capture-source';
+import { isSameCaptureDisplay } from '../utils/capture-display';
 import { formatRelativeSavedAt } from '../utils/format-date';
 import { detectLinkPlatform } from '../services/link.service';
 
@@ -38,7 +39,7 @@ interface CaptureGridProps {
   onSelect: (capture: Capture) => void;
 }
 
-const CaptureGridMedia: React.FC<{ capture: Capture }> = ({ capture }) => {
+const CaptureGridMedia = memo<{ capture: Capture }>(function CaptureGridMedia({ capture }) {
   const previewUrl = useCapturePreview(capture);
   const [hidden, setHidden] = useState(false);
   const badge = getCaptureSourceBadge(capture);
@@ -66,27 +67,31 @@ const CaptureGridMedia: React.FC<{ capture: Capture }> = ({ capture }) => {
       </span>
     </div>
   );
-};
+}, (prev, next) => isSameCaptureDisplay(prev.capture, next.capture));
 
-const CaptureGrid: React.FC<CaptureGridProps> = ({ captures, onSelect }) => {
+const CaptureGridItem = memo<{
+  capture: Capture;
+  onSelect: (capture: Capture) => void;
+}>(function CaptureGridItem({ capture, onSelect }) {
+  return (
+    <button type="button" className="capture-grid__item" onClick={() => onSelect(capture)}>
+      <CaptureGridMedia capture={capture} />
+      <div className="capture-grid__body">
+        <h3 className="capture-grid__title">{getCaptureDisplayTitle(capture)}</h3>
+        <span className="capture-grid__date">{formatRelativeSavedAt(capture.createdAt)}</span>
+      </div>
+    </button>
+  );
+}, (prev, next) => prev.onSelect === next.onSelect && isSameCaptureDisplay(prev.capture, next.capture));
+
+const CaptureGrid = memo<CaptureGridProps>(function CaptureGrid({ captures, onSelect }) {
   return (
     <div className="capture-grid">
       {captures.map((capture) => (
-        <button
-          key={capture.id}
-          type="button"
-          className="capture-grid__item"
-          onClick={() => onSelect(capture)}
-        >
-          <CaptureGridMedia capture={capture} />
-          <div className="capture-grid__body">
-            <h3 className="capture-grid__title">{getCaptureDisplayTitle(capture)}</h3>
-            <span className="capture-grid__date">{formatRelativeSavedAt(capture.createdAt)}</span>
-          </div>
-        </button>
+        <CaptureGridItem key={capture.id} capture={capture} onSelect={onSelect} />
       ))}
     </div>
   );
-};
+}, (prev, next) => prev.onSelect === next.onSelect && prev.captures === next.captures);
 
 export default CaptureGrid;

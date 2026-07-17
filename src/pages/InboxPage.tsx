@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   IonButton,
   IonButtons,
@@ -21,6 +21,7 @@ import { useHistory } from 'react-router-dom';
 import { addOutline, archiveOutline, checkmarkCircleOutline, fileTrayFullOutline, gridOutline, listOutline, playOutline, refreshOutline, settingsOutline } from 'ionicons/icons';
 import { useCaptureStore } from '../store/captureStore';
 import { Capture, CaptureStatus } from '../types/capture';
+import { useShallow } from 'zustand/react/shallow';
 import CaptureListItem from '../components/CaptureListItem';
 import CaptureGrid from '../components/CaptureGrid';
 import './InboxPage.css';
@@ -64,7 +65,18 @@ const InboxPage: React.FC = () => {
   const history = useHistory();
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<InboxViewMode>(readViewMode);
-  const { captures, loading, init, search, reload, statusFilter, statusCounts, setStatusFilter } = useCaptureStore();
+  const { captures, loading, init, search, reload, statusFilter, statusCounts, setStatusFilter } = useCaptureStore(
+    useShallow((state) => ({
+      captures: state.captures,
+      loading: state.loading,
+      init: state.init,
+      search: state.search,
+      reload: state.reload,
+      statusFilter: state.statusFilter,
+      statusCounts: state.statusCounts,
+      setStatusFilter: state.setStatusFilter
+    }))
+  );
 
   useEffect(() => {
     (async () => {
@@ -121,9 +133,12 @@ const InboxPage: React.FC = () => {
     });
   };
 
-  const openCapture = (capture: Capture) => {
-    history.push(`/capture/${capture.id}`);
-  };
+  const openCapture = useCallback(
+    (capture: Capture) => {
+      history.push(`/capture/${capture.id}`);
+    },
+    [history]
+  );
 
   return (
     <IonPage>
