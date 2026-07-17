@@ -34,6 +34,8 @@ vi.mock('../store/captureStore', () => ({
   useCaptureStore: {
     getState: () => ({
       initialized: false,
+      patchCapture: vi.fn(),
+      patchCaptures: vi.fn(),
       reload: vi.fn()
     })
   }

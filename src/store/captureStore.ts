@@ -3,6 +3,7 @@ import { Capture, CaptureStatus } from '../types/capture';
 import * as captureService from '../services/capture.service';
 import { seedMockCapturesIfEmpty } from '../services/seed.service';
 import { resetDatabase } from '../database/sqlite';
+import { isSameCaptureDisplay } from '../utils/capture-display';
 
 const EMPTY_STATUS_COUNTS: Record<CaptureStatus, number> = {
   INBOX: 0,
@@ -25,6 +26,8 @@ interface CaptureState {
   removeCapture: (id: string) => Promise<void>;
   updateCaptureTitle: (id: string, title: string) => Promise<void>;
   updateCaptureStatus: (id: string, status: CaptureStatus) => Promise<void>;
+  patchCapture: (id: string, updates: Partial<Omit<Capture, 'id' | 'createdAt'>>) => void;
+  patchCaptures: (patches: Record<string, Partial<Omit<Capture, 'id' | 'createdAt'>>>) => void;
   repairDatabase: () => Promise<void>;
 }
 
@@ -57,10 +60,10 @@ export const useCaptureStore = create<CaptureState>((set, get) => ({
         await seedMockCapturesIfEmpty();
       }
       const { statusFilter } = get();
+      await captureService.refreshDirtyCaptureTitles();
       const { captures, statusCounts } = await loadCapturesAndCounts(statusFilter);
       set({ captures, statusCounts, loading: false, initialized: true });
       captureService.enrichStaleUrlCaptures(captures);
-      void captureService.refreshDirtyCaptureTitles();
     } catch (error) {
       console.error('CaptureStore: init failed', error);
       set({ loading: false });
@@ -70,19 +73,21 @@ export const useCaptureStore = create<CaptureState>((set, get) => ({
   reload: async (options) => {
     const silent = options?.silent === true;
     if (!silent) {
-      console.log('CaptureStore: reload called');
+      console.log('[LaterStore] reload called');
       set({ loading: true });
     }
     try {
       const { statusFilter } = get();
+      if (!silent) {
+        await captureService.refreshDirtyCaptureTitles();
+      }
       const { captures, statusCounts } = await loadCapturesAndCounts(statusFilter);
       if (!silent) {
-        console.log('CaptureStore: reload finished, got', captures.length, 'captures');
+        console.log('[LaterStore] reload finished', captures.length, 'captures');
       }
       set({ captures, statusCounts, loading: false, initialized: true });
       if (!silent) {
         captureService.enrichStaleUrlCaptures(captures);
-        void captureService.refreshDirtyCaptureTitles();
       }
     } catch (error) {
       console.error('CaptureStore: reload failed', error);
@@ -128,6 +133,38 @@ export const useCaptureStore = create<CaptureState>((set, get) => ({
   updateCaptureStatus: async (id: string, status: CaptureStatus) => {
     await captureService.updateCaptureStatus(id, status);
     await get().reload();
+  },
+  patchCapture: (id, updates) => {
+    get().patchCaptures({ [id]: updates });
+  },
+  patchCaptures: (patches) => {
+    set((state) => {
+      let changed = false;
+      const captures = state.captures.slice();
+
+      for (const [id, updates] of Object.entries(patches)) {
+        const index = captures.findIndex((capture) => capture.id === id);
+        if (index === -1) {
+          continue;
+        }
+
+        const existing = captures[index];
+        if (isSameCaptureDisplay(existing, { ...existing, ...updates })) {
+          continue;
+        }
+
+        captures[index] = { ...existing, ...updates };
+        changed = true;
+      }
+
+      if (!changed) {
+        return state;
+      }
+
+      console.log('[LaterStore] patchCaptures', Object.keys(patches).join(','));
+
+      return { captures };
+    });
   },
   repairDatabase: async () => {
     set({ loading: true, initialized: false, captures: [], statusCounts: EMPTY_STATUS_COUNTS });

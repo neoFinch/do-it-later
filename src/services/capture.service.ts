@@ -5,14 +5,12 @@ import { initializeContentDocumentTable } from '../database/content-document.rep
 import { initializeCaptureProcessingTable } from '../database/processing.repository';
 import { fetchUrlMetadata } from './metadata.service';
 import { deletePersistedFile, isImageMime, persistSharedFile, SharedFileInput } from './file.service';
-import { cleanTitle, isDirtyShareTitle } from './title.service';
+import { cleanTitle, getCaptureDisplayTitle, isDirtyShareTitle } from './title.service';
 import { canonicalizeCaptureUrl } from './link.service';
 import { useCaptureStore } from '../store/captureStore';
 import { deleteCaptureArtifacts, queueCaptureProcessing } from './processing.service';
 import { pickThumbnailUrl, resolveThumbnailForUrl } from './thumbnail.service';
-
-const INBOX_REFRESH_DEBOUNCE_MS = 300;
-let inboxRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+import { isSameCaptureDisplay } from '../utils/capture-display';
 
 export const initializeCaptureService = async (): Promise<void> => {
   await repository.initializeCaptureTable();
@@ -87,24 +85,37 @@ const shouldReplaceTitle = (existingTitle: string | null | undefined, url: strin
   return !normalized || normalized === url;
 };
 
-const scheduleInboxRefresh = (): void => {
-  const { initialized } = useCaptureStore.getState();
-  if (!initialized) {
+const PATCH_BATCH_DEBOUNCE_MS = 400;
+const pendingPatches = new Map<string, Partial<Omit<Capture, 'id' | 'createdAt'>>>();
+let patchBatchTimer: ReturnType<typeof setTimeout> | null = null;
+
+const flushPendingPatches = (): void => {
+  patchBatchTimer = null;
+  if (pendingPatches.size === 0) {
     return;
   }
 
-  if (inboxRefreshTimer) {
-    clearTimeout(inboxRefreshTimer);
-  }
+  const { initialized, patchCaptures } = useCaptureStore.getState();
+  const batch = Object.fromEntries(pendingPatches);
+  pendingPatches.clear();
 
-  inboxRefreshTimer = setTimeout(() => {
-    inboxRefreshTimer = null;
-    void useCaptureStore.getState().reload({ silent: true });
-  }, INBOX_REFRESH_DEBOUNCE_MS);
+  if (initialized) {
+    patchCaptures(batch);
+  }
 };
 
-export const refreshInboxIfInitialized = (): void => {
-  scheduleInboxRefresh();
+export const patchInboxCaptureIfInitialized = (
+  id: string,
+  updates: Partial<Omit<Capture, 'id' | 'createdAt'>>
+): void => {
+  const existing = pendingPatches.get(id) ?? {};
+  pendingPatches.set(id, { ...existing, ...updates });
+
+  if (patchBatchTimer) {
+    clearTimeout(patchBatchTimer);
+  }
+
+  patchBatchTimer = setTimeout(flushPendingPatches, PATCH_BATCH_DEBOUNCE_MS);
 };
 
 export interface EnrichUrlResult {
@@ -131,7 +142,7 @@ export const enrichUrlCapture = async (
     if (thumbnail && (force || !existing?.thumbnail || thumbnail !== existing.thumbnail)) {
       updates.thumbnail = thumbnail;
     }
-    if (metadata.source) {
+    if (metadata.source && metadata.source !== existing?.source) {
       updates.source = metadata.source;
     }
     if (
@@ -158,7 +169,9 @@ export const enrichUrlCapture = async (
     }
 
     await updateCapture(id, updates);
-    refreshInboxIfInitialized();
+    if (!existing || !isSameCaptureDisplay(existing, { ...existing, ...updates })) {
+      patchInboxCaptureIfInitialized(id, updates);
+    }
 
     const refreshed = await repository.getCaptureById(id);
     return {
@@ -174,8 +187,9 @@ export const enrichUrlCapture = async (
     const message = error instanceof Error ? error.message : String(error);
 
     if (fallbackThumbnail && (force || !existing?.thumbnail)) {
-      await updateCapture(id, { thumbnail: fallbackThumbnail });
-      refreshInboxIfInitialized();
+      const thumbnailUpdate = { thumbnail: fallbackThumbnail };
+      await updateCapture(id, thumbnailUpdate);
+      patchInboxCaptureIfInitialized(id, thumbnailUpdate);
       return {
         updated: true,
         thumbnail: fallbackThumbnail,
@@ -210,7 +224,6 @@ export const enrichStaleUrlCaptures = (captures: Capture[]): void => {
 
 export const refreshDirtyCaptureTitles = async (): Promise<void> => {
   const captures = await listCaptures();
-  let updated = 0;
 
   await Promise.all(
     captures.map(async (capture) => {
@@ -225,24 +238,25 @@ export const refreshDirtyCaptureTitles = async (): Promise<void> => {
       }
 
       await updateCapture(capture.id, { title: nextTitle });
-      updated += 1;
+
+      const displayUnchanged =
+        getCaptureDisplayTitle(capture) === getCaptureDisplayTitle({ ...capture, title: nextTitle });
+      if (displayUnchanged) {
+        return;
+      }
+
+      patchInboxCaptureIfInitialized(capture.id, { title: nextTitle });
     })
   );
-
-  if (updated > 0) {
-    refreshInboxIfInitialized();
-  }
 };
 
 export const updateCaptureTitle = async (id: string, title: string): Promise<void> => {
   const trimmed = title.trim();
   await updateCapture(id, { title: trimmed ? trimmed : null });
-  refreshInboxIfInitialized();
 };
 
 export const updateCaptureStatus = async (id: string, status: CaptureStatus): Promise<void> => {
   await updateCapture(id, { status });
-  refreshInboxIfInitialized();
 };
 
 export const createUrlCapture = async (url: string, title?: string | null): Promise<string> => {

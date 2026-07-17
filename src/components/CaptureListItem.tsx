@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import { IonButton, IonIcon, IonItem } from '@ionic/react';
 import {
   documentOutline,
@@ -19,6 +19,7 @@ import { isImageMime } from '../services/file.service';
 import { openLink, detectLinkPlatform } from '../services/link.service';
 import { getCaptureDisplayTitle } from '../services/title.service';
 import { getCaptureSourceBadge, SourceBadgeVariant } from '../utils/capture-source';
+import { isSameCaptureDisplay } from '../utils/capture-display';
 import { formatRelativeSavedAt } from '../utils/format-date';
 import './CaptureListItem.css';
 
@@ -40,7 +41,7 @@ interface CaptureListItemProps {
   onSelect: (capture: Capture) => void;
 }
 
-const CaptureListMedia: React.FC<{ capture: Capture }> = ({ capture }) => {
+const CaptureListMedia = memo<{ capture: Capture }>(function CaptureListMedia({ capture }) {
   const previewUrl = useCapturePreview(capture);
   const [hidden, setHidden] = useState(false);
 
@@ -74,9 +75,9 @@ const CaptureListMedia: React.FC<{ capture: Capture }> = ({ capture }) => {
       <IonIcon icon={icon} />
     </div>
   );
-};
+}, (prev, next) => isSameCaptureDisplay(prev.capture, next.capture));
 
-const CaptureListItem: React.FC<CaptureListItemProps> = ({ capture, onSelect }) => {
+const CaptureListItem = memo<CaptureListItemProps>(function CaptureListItem({ capture, onSelect }) {
   const badge = getCaptureSourceBadge(capture);
   const canOpenLink = capture.type === 'url' && !!capture.url;
 
@@ -125,6 +126,6 @@ const CaptureListItem: React.FC<CaptureListItemProps> = ({ capture, onSelect }) 
       )}
     </IonItem>
   );
-};
+}, (prev, next) => prev.onSelect === next.onSelect && isSameCaptureDisplay(prev.capture, next.capture));
 
 export default CaptureListItem;
