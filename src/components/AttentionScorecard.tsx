@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { IonButton, IonIcon, IonSpinner, IonText } from '@ionic/react';
-import { alertCircleOutline, chevronDownOutline, chevronUpOutline, refreshOutline } from 'ionicons/icons';
+import { alertCircleOutline, chevronDownOutline, chevronUpOutline, refreshOutline, colorWandOutline, colorWand } from 'ionicons/icons';
 import { buildAttentionScorecard, renderStars } from '../services/ai/attention-scorecard.service';
 import { AIAnalysis } from '../types/ai-analysis';
 import { CaptureProcessing } from '../types/capture-processing';
@@ -73,7 +73,12 @@ const AttentionScorecard: React.FC<AttentionScorecardProps> = ({
           aria-label={analyzeLabel}
           onClick={onAnalyze}
         >
-          {busy ? <IonSpinner name="crescent" /> : <IonIcon icon={refreshOutline} slot="icon-only" />}
+          {busy ?
+            <IonSpinner name="crescent" /> :
+            <span style={{ fontSize: '16px' }} >
+              <IonIcon icon={colorWand} slot="icon-only" />
+            </span>
+          }
         </IonButton>
       </div>
 
