@@ -366,7 +366,6 @@ const CaptureDetailPage: React.FC = () => {
 
           {showUnderstanding && (
             <>
-              {/* TODO(product): maybe hide Extracted content from end users — see CaptureExtractedContent.tsx */}
               <CaptureExtractedContent
                 processing={processing}
                 document={document}

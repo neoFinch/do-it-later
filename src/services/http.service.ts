@@ -8,6 +8,12 @@ export interface FetchTextOptions {
   userAgent?: string;
 }
 
+export interface FetchImageOptions {
+  timeoutMs?: number;
+  userAgent?: string;
+  referer?: string;
+}
+
 export interface PostRemoteOptions {
   timeoutMs?: number;
   headers?: Record<string, string>;
@@ -67,6 +73,43 @@ export const fetchRemoteText = async (url: string, options: FetchTextOptions = {
     }
 
     return normalizeResponseText(response.data);
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith('HTTP ')) {
+      throw error;
+    }
+    throw new Error(formatNetworkError(error));
+  }
+};
+
+export const fetchRemoteImageBase64 = async (url: string, options: FetchImageOptions = {}): Promise<string> => {
+  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const headers: Record<string, string> = {
+    Accept: 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+    'User-Agent': options.userAgent ?? 'Mozilla/5.0 (compatible; CaptureInbox/1.0)'
+  };
+
+  if (options.referer) {
+    headers.Referer = options.referer;
+  }
+
+  try {
+    const response = await CapacitorHttp.get({
+      url,
+      connectTimeout: timeoutMs,
+      readTimeout: timeoutMs,
+      responseType: 'blob',
+      headers
+    });
+
+    if (response.status >= 400) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    if (typeof response.data !== 'string' || !response.data.trim()) {
+      throw new Error('Empty image response');
+    }
+
+    return response.data;
   } catch (error) {
     if (error instanceof Error && error.message.startsWith('HTTP ')) {
       throw error;

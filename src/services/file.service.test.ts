@@ -3,6 +3,8 @@ import {
   isImageMime,
   isImagePath,
   isLegacyLocalFilePath,
+  isPersistedCapturePath,
+  isRemoteHttpUrl,
   sanitizeFileName
 } from './file.service';
 
@@ -25,5 +27,12 @@ describe('file.service helpers', () => {
   it('detects legacy android file paths', () => {
     expect(isLegacyLocalFilePath('/data/user/0/io.ionic.starter/cache/shared_files/a.png')).toBe(true);
     expect(isLegacyLocalFilePath('Just a note')).toBe(false);
+  });
+
+  it('detects remote and persisted thumbnail paths', () => {
+    expect(isRemoteHttpUrl('https://cdn.example.com/thumb.jpg')).toBe(true);
+    expect(isRemoteHttpUrl('captures/id/thumbnail.jpg')).toBe(false);
+    expect(isPersistedCapturePath('captures/id/thumbnail.jpg')).toBe(true);
+    expect(isPersistedCapturePath('https://cdn.example.com/thumb.jpg')).toBe(false);
   });
 });

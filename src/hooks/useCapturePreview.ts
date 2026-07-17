@@ -1,11 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Capture } from '../types/capture';
-import { isLegacyLocalFilePath, resolveCapturePreviewUrl } from '../services/file.service';
+import {
+  isLegacyLocalFilePath,
+  isPersistedCapturePath,
+  isRemoteHttpUrl,
+  resolveCapturePreviewUrl,
+  resolveThumbnailPreviewUrl
+} from '../services/file.service';
 import { resolveThumbnailForUrl } from '../services/thumbnail.service';
 
 const getSyncPreviewUrl = (capture: Capture): string | null => {
   if (capture.type === 'url') {
-    if (capture.thumbnail) {
+    if (capture.thumbnail && isRemoteHttpUrl(capture.thumbnail)) {
       return capture.thumbnail;
     }
     return resolveThumbnailForUrl(capture.url ?? '') ?? null;
@@ -16,6 +22,10 @@ const getSyncPreviewUrl = (capture: Capture): string | null => {
 
 const captureNeedsAsyncPreview = (capture: Capture): boolean => {
   if (capture.type === 'file') {
+    return true;
+  }
+
+  if (capture.type === 'url' && capture.thumbnail && isPersistedCapturePath(capture.thumbnail)) {
     return true;
   }
 
@@ -32,13 +42,18 @@ export const useCapturePreview = (capture: Capture): string | null => {
 
   useEffect(() => {
     if (!needsAsync) {
+      setAsyncUrl(null);
       return;
     }
 
     let cancelled = false;
 
     (async () => {
-      const url = await resolveCapturePreviewUrl(capture);
+      const url =
+        capture.type === 'url' && capture.thumbnail && isPersistedCapturePath(capture.thumbnail)
+          ? await resolveThumbnailPreviewUrl(capture.thumbnail)
+          : await resolveCapturePreviewUrl(capture);
+
       if (!cancelled) {
         setAsyncUrl(url);
       }
