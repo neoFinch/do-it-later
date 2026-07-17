@@ -96,8 +96,15 @@ export const extractCapture = async (captureId: string, options?: { force?: bool
       await setExtractionStatus(captureId, 'completed', null);
 
       if (extraction.document.thumbnail && !capture.thumbnail && capture.type === 'url') {
-        const { updateCapture, patchInboxCaptureIfInitialized } = await import('./capture.service');
-        const thumbnailUpdate = { thumbnail: extraction.document.thumbnail };
+        const { materializeCaptureThumbnail, updateCapture, patchInboxCaptureIfInitialized } = await import(
+          './capture.service'
+        );
+        const thumbnail = await materializeCaptureThumbnail(
+          captureId,
+          capture.url ?? '',
+          extraction.document.thumbnail
+        );
+        const thumbnailUpdate = { thumbnail };
         await updateCapture(captureId, thumbnailUpdate);
         patchInboxCaptureIfInitialized(captureId, thumbnailUpdate);
       }

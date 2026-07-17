@@ -1,6 +1,9 @@
 import { Capacitor } from '@capacitor/core';
 import { Directory, Filesystem } from '@capacitor/filesystem';
 import { Capture } from '../types/capture';
+import { detectLinkPlatform, normalizeUrl } from './link.service';
+import { fetchRemoteImageBase64 } from './http.service';
+import { METADATA_USER_AGENT } from './metadata.service';
 import { resolveThumbnailForUrl } from './thumbnail.service';
 
 export interface SharedFileInput {
@@ -28,6 +31,75 @@ export const isLegacyLocalFilePath = (value: string): boolean => {
   return /^\/(?:data|storage)\/.+/i.test(path);
 };
 
+export const isRemoteHttpUrl = (value?: string | null): boolean => {
+  return /^https?:\/\//i.test(value?.trim() ?? '');
+};
+
+export const isPersistedCapturePath = (value?: string | null): boolean => {
+  return (value?.trim() ?? '').startsWith('captures/');
+};
+
+const shouldPersistRemoteThumbnail = (imageUrl: string, pageUrl: string): boolean => {
+  const platform = detectLinkPlatform(pageUrl);
+  if (platform === 'instagram' || platform === 'tiktok') {
+    return true;
+  }
+
+  try {
+    const host = new URL(imageUrl).hostname.toLowerCase();
+    return host.includes('cdninstagram.com') || host.includes('fbcdn.net') || host.includes('tiktokcdn');
+  } catch {
+    return false;
+  }
+};
+
+export const persistRemoteThumbnail = async (
+  captureId: string,
+  imageUrl: string,
+  pageUrl: string
+): Promise<string | null> => {
+  if (Capacitor.getPlatform() === 'web' || !shouldPersistRemoteThumbnail(imageUrl, pageUrl)) {
+    return null;
+  }
+
+  const relativePath = `captures/${captureId}/thumbnail.jpg`;
+
+  try {
+    const data = await fetchRemoteImageBase64(imageUrl, {
+      referer: normalizeUrl(pageUrl),
+      userAgent: METADATA_USER_AGENT
+    });
+
+    await Filesystem.writeFile({
+      path: relativePath,
+      data,
+      directory: Directory.Data,
+      recursive: true
+    });
+
+    return relativePath;
+  } catch (error) {
+    console.warn('Failed to persist remote thumbnail', { captureId, imageUrl, error });
+    return null;
+  }
+};
+
+export const resolveThumbnailPreviewUrl = async (thumbnail?: string | null): Promise<string | null> => {
+  if (!thumbnail?.trim()) {
+    return null;
+  }
+
+  if (isRemoteHttpUrl(thumbnail)) {
+    return thumbnail;
+  }
+
+  if (isPersistedCapturePath(thumbnail)) {
+    return getLocalFilePreviewUrl(thumbnail);
+  }
+
+  return null;
+};
+
 export const getLocalFilePreviewUrl = async (relativePath: string): Promise<string | null> => {
   if (Capacitor.getPlatform() === 'web') {
     return null;
@@ -52,8 +124,9 @@ export const getAbsoluteFilePreviewUrl = (absolutePath: string): string => {
 
 export const resolveCapturePreviewUrl = async (capture: Capture): Promise<string | null> => {
   if (capture.type === 'url') {
-    if (capture.thumbnail) {
-      return capture.thumbnail;
+    const persisted = await resolveThumbnailPreviewUrl(capture.thumbnail);
+    if (persisted) {
+      return persisted;
     }
     return resolveThumbnailForUrl(capture.url ?? '') ?? null;
   }

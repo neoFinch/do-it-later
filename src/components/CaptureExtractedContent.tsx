@@ -1,12 +1,26 @@
-import { IonButton, IonIcon, IonSpinner, IonText } from '@ionic/react';
-import { alertCircleOutline, openOutline, refreshOutline } from 'ionicons/icons';
+import { useEffect, useState } from 'react';
+import {
+  IonButton,
+  IonButtons,
+  IonContent,
+  IonHeader,
+  IonIcon,
+  IonModal,
+  IonSpinner,
+  IonText,
+  IonTitle,
+  IonToolbar
+} from '@ionic/react';
+import {
+  alertCircleOutline,
+  checkmarkCircleOutline,
+  closeOutline,
+  openOutline,
+  refreshOutline
+} from 'ionicons/icons';
 import { CaptureProcessing } from '../types/capture-processing';
 import { ContentDocument } from '../types/content-document';
 import { INSTAGRAM_RESTRICTED_MESSAGE } from '../services/extractors/social-text';
-
-// TODO(product): Consider hiding this section from end users. Extraction should
-// still run for AI analysis, but the raw transcript/article preview may be
-// noise on the detail screen. Parked — keep for debugging until UX is settled.
 
 interface CaptureExtractedContentProps {
   processing: CaptureProcessing | null;
@@ -17,8 +31,6 @@ interface CaptureExtractedContentProps {
   onOpenLink?: () => void;
   openLinkLabel?: string;
 }
-
-const PREVIEW_LIMIT = 600;
 
 const extractionStatusMessage = (
   processing: CaptureProcessing | null,
@@ -55,12 +67,8 @@ const extractionStatusMessage = (
   return 'No extracted content yet. Tap Try again to fetch it.';
 };
 
-const getPreviewText = (document: ContentDocument): string => {
-  const text = document.transcript?.trim() || document.articleText?.trim() || '';
-  if (text.length <= PREVIEW_LIMIT) {
-    return text;
-  }
-  return `${text.slice(0, PREVIEW_LIMIT)}…`;
+export const getExtractedText = (document: ContentDocument): string => {
+  return document.transcript?.trim() || document.articleText?.trim() || '';
 };
 
 const CaptureExtractedContent: React.FC<CaptureExtractedContentProps> = ({
@@ -72,7 +80,8 @@ const CaptureExtractedContent: React.FC<CaptureExtractedContentProps> = ({
   onOpenLink,
   openLinkLabel
 }) => {
-  const preview = document ? getPreviewText(document) : '';
+  const [showFullText, setShowFullText] = useState(false);
+  const fullText = document ? getExtractedText(document) : '';
   const failed = processing?.extractionStatus === 'failed' && !document;
   const empty = !document && !busy && processing?.extractionStatus !== 'processing';
   const showRetryCta = failed || empty || (!!document && missingThumbnail);
@@ -80,71 +89,119 @@ const CaptureExtractedContent: React.FC<CaptureExtractedContentProps> = ({
     !!processing?.extractionError && processing.extractionError.includes('hid this post from scrapers');
   const errorText = processing?.extractionError ?? (failed ? INSTAGRAM_RESTRICTED_MESSAGE : null);
 
+  useEffect(() => {
+    setShowFullText(false);
+  }, [document?.captureId, document?.extractedAt, fullText]);
+
   return (
-    <section className="capture-detail__section capture-extracted">
-      <div className="capture-extracted__header">
-        <h2 className="capture-detail__label">Extracted content</h2>
-        <IonButton
-          fill="clear"
-          size="small"
-          color="medium"
-          disabled={busy}
-          aria-label="Refresh preview and extraction"
-          onClick={onRetry}
-        >
-          {busy ? <IonSpinner name="crescent" /> : <IonIcon icon={refreshOutline} slot="icon-only" />}
-        </IonButton>
-      </div>
-
-      {!document ? (
-        <div className="capture-extracted__pending">
-          {(busy || processing?.extractionStatus === 'processing') && <IonSpinner name="crescent" />}
-          <IonText color={failed ? 'danger' : 'medium'}>
-            <p>{extractionStatusMessage(processing, document, missingThumbnail)}</p>
-          </IonText>
-        </div>
-      ) : (
-        <>
-          {preview && <p className="capture-extracted__preview">{preview}</p>}
-          {missingThumbnail && (
-            <IonText color="medium">
-              <p className="capture-extracted__hint">
-                Preview image missing — Instagram sometimes blocks images. Open the link to view the post.
-              </p>
-            </IonText>
-          )}
-        </>
-      )}
-
-      {failed && errorText && (
-        <IonText color="danger">
-          <p className="capture-extracted__error">
-            <IonIcon icon={alertCircleOutline} /> {errorText}
-          </p>
-        </IonText>
-      )}
-
-      <div className="capture-extracted__actions">
-        {onOpenLink && (failed || restricted || missingThumbnail) && (
-          <IonButton expand="block" fill="solid" color="dark" disabled={busy} onClick={onOpenLink}>
-            <IonIcon icon={openOutline} slot="start" />
-            {openLinkLabel ?? 'Open link'}
-          </IonButton>
-        )}
-        {showRetryCta && (
+    <>
+      <section className="capture-detail__section capture-extracted">
+        <div className="capture-extracted__header">
+          <h2 className="capture-detail__label">Extracted content</h2>
           <IonButton
-            className="capture-extracted__retry"
-            expand="block"
-            fill="outline"
+            fill="clear"
+            size="small"
             color="medium"
             disabled={busy}
+            aria-label="Refresh preview and extraction"
             onClick={onRetry}
           >
-            {busy ? <IonSpinner name="crescent" /> : restricted ? 'Check again' : 'Try again'}
+            {busy ? <IonSpinner name="crescent" /> : <IonIcon icon={refreshOutline} slot="icon-only" />}
+          </IonButton>
+        </div>
+
+        {!document ? (
+          <div className="capture-extracted__pending">
+            {(busy || processing?.extractionStatus === 'processing') && <IonSpinner name="crescent" />}
+            <IonText color={failed ? 'danger' : 'medium'}>
+              <p>{extractionStatusMessage(processing, document, missingThumbnail)}</p>
+            </IonText>
+          </div>
+        ) : (
+          <div className="capture-extracted__success">
+            <IonIcon
+              icon={checkmarkCircleOutline}
+              className="capture-extracted__success-icon"
+              color="success"
+              aria-hidden="true"
+            />
+            <div className="capture-extracted__success-copy">
+              <p className="capture-extracted__success-title">Content extracted successfully</p>
+              {missingThumbnail ? (
+                <IonText color="medium">
+                  <p className="capture-extracted__hint">
+                    Preview image missing — Instagram sometimes blocks images. Open the link to view the post.
+                  </p>
+                </IonText>
+              ) : (
+                <IonText color="medium">
+                  <p className="capture-extracted__success-subtitle">
+                    {fullText ? 'Caption and transcript are ready to review.' : 'Preview refreshed from this link.'}
+                  </p>
+                </IonText>
+              )}
+            </div>
+          </div>
+        )}
+
+        {document && fullText && (
+          <IonButton
+            className="capture-extracted__view-more"
+            fill="clear"
+            size="small"
+            color="primary"
+            onClick={() => setShowFullText(true)}
+          >
+            View full text
           </IonButton>
         )}
-      </div>
-    </section>
+
+        {failed && errorText && (
+          <IonText color="danger">
+            <p className="capture-extracted__error">
+              <IonIcon icon={alertCircleOutline} /> {errorText}
+            </p>
+          </IonText>
+        )}
+
+        <div className="capture-extracted__actions">
+          {onOpenLink && (failed || restricted || missingThumbnail) && (
+            <IonButton expand="block" fill="solid" color="dark" disabled={busy} onClick={onOpenLink}>
+              <IonIcon icon={openOutline} slot="start" />
+              {openLinkLabel ?? 'Open link'}
+            </IonButton>
+          )}
+          {showRetryCta && (
+            <IonButton
+              className="capture-extracted__retry"
+              expand="block"
+              fill="outline"
+              color="medium"
+              disabled={busy}
+              onClick={onRetry}
+            >
+              {busy ? <IonSpinner name="crescent" /> : restricted ? 'Check again' : 'Try again'}
+            </IonButton>
+          )}
+        </div>
+      </section>
+
+      <IonModal isOpen={showFullText} onDidDismiss={() => setShowFullText(false)}>
+        <IonHeader>
+          <IonToolbar>
+            <IonTitle>Extracted content</IonTitle>
+            <IonButtons slot="end">
+              <IonButton aria-label="Close" onClick={() => setShowFullText(false)}>
+                <IonIcon icon={closeOutline} slot="icon-only" />
+              </IonButton>
+            </IonButtons>
+          </IonToolbar>
+        </IonHeader>
+        <IonContent className="ion-padding capture-extracted__modal-content">
+          <p className="capture-extracted__full-text">{fullText}</p>
+        </IonContent>
+      </IonModal>
+    </>
   );
 };
 

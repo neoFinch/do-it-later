@@ -4,7 +4,15 @@ import { initializeAiAnalysisTable } from '../database/ai-analysis.repository';
 import { initializeContentDocumentTable } from '../database/content-document.repository';
 import { initializeCaptureProcessingTable } from '../database/processing.repository';
 import { fetchUrlMetadata } from './metadata.service';
-import { deletePersistedFile, isImageMime, persistSharedFile, SharedFileInput } from './file.service';
+import {
+  deletePersistedFile,
+  isImageMime,
+  isPersistedCapturePath,
+  isRemoteHttpUrl,
+  persistRemoteThumbnail,
+  persistSharedFile,
+  SharedFileInput
+} from './file.service';
 import { cleanTitle, getCaptureDisplayTitle, isDirtyShareTitle } from './title.service';
 import { canonicalizeCaptureUrl } from './link.service';
 import { useCaptureStore } from '../store/captureStore';
@@ -31,6 +39,9 @@ export const deleteCapture = async (id: string): Promise<void> => {
   const existing = await repository.getCaptureById(id);
   if (existing?.type === 'file' && existing.content) {
     await deletePersistedFile(existing.content);
+  }
+  if (existing?.thumbnail && isPersistedCapturePath(existing.thumbnail)) {
+    await deletePersistedFile(existing.thumbnail);
   }
   await deleteCaptureArtifacts(id);
   await repository.deleteCapture(id);
@@ -78,6 +89,23 @@ export const updateCapture = async (
     ...existing,
     ...updates
   });
+};
+
+export const materializeCaptureThumbnail = async (
+  captureId: string,
+  pageUrl: string,
+  thumbnail?: string | null
+): Promise<string | null> => {
+  if (!thumbnail?.trim()) {
+    return null;
+  }
+
+  if (!isRemoteHttpUrl(thumbnail)) {
+    return thumbnail;
+  }
+
+  const persisted = await persistRemoteThumbnail(captureId, thumbnail, pageUrl);
+  return persisted ?? thumbnail;
 };
 
 const shouldReplaceTitle = (existingTitle: string | null | undefined, url: string): boolean => {
@@ -138,7 +166,10 @@ export const enrichUrlCapture = async (
     const metadata = (await fetchUrlMetadata(url)) ?? {};
     const updates: Partial<Omit<Capture, 'id' | 'createdAt'>> = {};
 
-    const thumbnail = pickThumbnailUrl(url, [metadata.thumbnail]);
+    let thumbnail = pickThumbnailUrl(url, [metadata.thumbnail]);
+    if (thumbnail) {
+      thumbnail = (await materializeCaptureThumbnail(id, url, thumbnail)) ?? undefined;
+    }
     if (thumbnail && (force || !existing?.thumbnail || thumbnail !== existing.thumbnail)) {
       updates.thumbnail = thumbnail;
     }
