@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { refreshCaptureMedia } from './capture-refresh.service';
+import { refreshCaptureMedia, refreshCaptureThumbnail } from './capture-refresh.service';
 
 vi.mock('./capture.service', () => ({
   getCapture: vi.fn(),
@@ -17,6 +17,7 @@ vi.mock('../database/processing.repository', () => ({
 import { enrichUrlCapture, getCapture } from './capture.service';
 import { extractCapture } from './extraction.service';
 import { getCaptureProcessing } from '../database/processing.repository';
+import { createDefaultProcessingState } from '../types/capture-processing';
 
 describe('capture-refresh.service', () => {
   beforeEach(() => {
@@ -54,12 +55,8 @@ describe('capture-refresh.service', () => {
     });
     vi.mocked(extractCapture).mockResolvedValue(document);
     vi.mocked(getCaptureProcessing).mockResolvedValue({
-      captureId: 'c1',
-      extractionStatus: 'completed',
-      analysisStatus: 'pending',
-      extractionError: null,
-      analysisError: null,
-      updatedAt: Date.now()
+      ...createDefaultProcessingState('c1', Date.now()),
+      extractionStatus: 'completed'
     });
 
     const result = await refreshCaptureMedia('c1');
@@ -93,12 +90,10 @@ describe('capture-refresh.service', () => {
     });
     vi.mocked(extractCapture).mockResolvedValue(null);
     vi.mocked(getCaptureProcessing).mockResolvedValue({
-      captureId: 'c2',
+      ...createDefaultProcessingState('c2', Date.now()),
       extractionStatus: 'failed',
       analysisStatus: 'skipped',
-      extractionError: 'Instagram blocked this page (login wall).',
-      analysisError: null,
-      updatedAt: Date.now()
+      extractionError: 'Instagram blocked this page (login wall).'
     });
 
     const result = await refreshCaptureMedia('c2');
@@ -106,5 +101,39 @@ describe('capture-refresh.service', () => {
     expect(result.extractionOk).toBe(false);
     expect(result.thumbnailPresent).toBe(false);
     expect(result.userMessage).toContain('Instagram blocked');
+  });
+
+  it('refreshes only the preview thumbnail for url captures', async () => {
+    const capture = {
+      id: 'c3',
+      type: 'url' as const,
+      title: 'Old reel',
+      url: 'https://www.instagram.com/reel/abc/',
+      content: null,
+      source: 'Instagram',
+      thumbnail: null,
+      status: 'INBOX' as const,
+      createdAt: Date.now()
+    };
+
+    vi.mocked(getCapture)
+      .mockResolvedValueOnce(capture)
+      .mockResolvedValueOnce({ ...capture, thumbnail: 'captures/c3/thumbnail.jpg' });
+    vi.mocked(enrichUrlCapture).mockResolvedValue({
+      updated: true,
+      thumbnail: 'captures/c3/thumbnail.jpg',
+      title: 'Old reel',
+      error: null
+    });
+
+    const result = await refreshCaptureThumbnail('c3');
+
+    expect(enrichUrlCapture).toHaveBeenCalledWith('c3', capture.url, capture.title, {
+      force: true,
+      thumbnailOnly: true
+    });
+    expect(extractCapture).not.toHaveBeenCalled();
+    expect(result.thumbnailPresent).toBe(true);
+    expect(result.userMessage).toContain('Preview image updated');
   });
 });

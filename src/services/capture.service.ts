@@ -19,6 +19,12 @@ import { useCaptureStore } from '../store/captureStore';
 import { deleteCaptureArtifacts, queueCaptureProcessing } from './processing.service';
 import { pickThumbnailUrl, resolveThumbnailForUrl } from './thumbnail.service';
 import { isSameCaptureDisplay } from '../utils/capture-display';
+import { getPipelineStages } from '../database/ai-pipeline.repository';
+import {
+  buildCaptureSearchContext,
+  matchesCaptureSearch,
+  normalizeSearchQuery
+} from './capture-search.service';
 
 export const initializeCaptureService = async (): Promise<void> => {
   await repository.initializeCaptureTable();
@@ -48,10 +54,23 @@ export const deleteCapture = async (id: string): Promise<void> => {
 };
 
 export const searchCaptures = async (query: string, status?: CaptureStatus): Promise<Capture[]> => {
-  if (!query.trim()) {
-    return repository.listCaptures(status);
+  const captures = await repository.listCaptures(status);
+  const normalizedQuery = normalizeSearchQuery(query);
+  if (!normalizedQuery) {
+    return captures;
   }
-  return repository.searchCaptures(query, status);
+
+  const contexts = await Promise.all(
+    captures.map(async (capture) => {
+      const stages = await getPipelineStages(capture.id);
+      return buildCaptureSearchContext({ capture, ...stages });
+    })
+  );
+
+  return contexts
+    .filter((context) => matchesCaptureSearch(context, query))
+    .map((context) => context.capture)
+    .sort((a, b) => b.createdAt - a.createdAt);
 };
 
 export const countCapturesByStatus = async (): Promise<Record<CaptureStatus, number>> => {
@@ -157,9 +176,10 @@ export const enrichUrlCapture = async (
   id: string,
   url: string,
   existingTitle?: string | null,
-  options?: { force?: boolean }
+  options?: { force?: boolean; thumbnailOnly?: boolean }
 ): Promise<EnrichUrlResult> => {
   const force = options?.force === true;
+  const thumbnailOnly = options?.thumbnailOnly === true;
   const existing = await repository.getCaptureById(id);
 
   try {
@@ -173,17 +193,18 @@ export const enrichUrlCapture = async (
     if (thumbnail && (force || !existing?.thumbnail || thumbnail !== existing.thumbnail)) {
       updates.thumbnail = thumbnail;
     }
-    if (metadata.source && metadata.source !== existing?.source) {
+    if (!thumbnailOnly && metadata.source && metadata.source !== existing?.source) {
       updates.source = metadata.source;
     }
     if (
+      !thumbnailOnly &&
       metadata.title &&
       (shouldReplaceTitle(existingTitle, url) ||
         isDirtyShareTitle(existingTitle, url) ||
         (force && !existingTitle?.trim()))
     ) {
       updates.title = cleanTitle(metadata.title);
-    } else if (existingTitle && isDirtyShareTitle(existingTitle, url)) {
+    } else if (!thumbnailOnly && existingTitle && isDirtyShareTitle(existingTitle, url)) {
       updates.title = cleanTitle(existingTitle);
     }
 
@@ -193,7 +214,7 @@ export const enrichUrlCapture = async (
         thumbnail: existing?.thumbnail ?? thumbnail ?? null,
         title: existing?.title ?? null,
         error:
-          force && !thumbnail
+          force && !existing?.thumbnail && !thumbnail
             ? 'Instagram (or this site) hid the preview image from scrapers. Your link is still saved — open it to view the content.'
             : null
       };

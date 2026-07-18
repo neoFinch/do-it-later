@@ -6,6 +6,7 @@ import {
   IonContent,
   IonHeader,
   IonIcon,
+  IonModal,
   IonPage,
   IonSpinner,
   IonTextarea,
@@ -17,7 +18,10 @@ import {
   archiveOutline,
   arrowUndoOutline,
   checkmarkCircleOutline,
+  closeOutline,
+  expandOutline,
   openOutline,
+  refreshOutline,
   trashOutline
 } from 'ionicons/icons';
 import { useHistory, useParams } from 'react-router-dom';
@@ -32,14 +36,13 @@ import { getCaptureSourceBadge } from '../utils/capture-source';
 import { formatRelativeSavedAt } from '../utils/format-date';
 import { getContentConsumeLabel } from '../utils/content-duration';
 import { getCaptureUnderstanding, analyzeCapture } from '../services/processing.service';
-import { refreshCaptureMedia } from '../services/capture-refresh.service';
+import { refreshCaptureMedia, refreshCaptureThumbnail } from '../services/capture-refresh.service';
 import { hasUsableExtractedContent } from '../services/extractors/document-body';
 import { AIAnalysis } from '../types/ai-analysis';
 import { CaptureProcessing } from '../types/capture-processing';
 import { ContentDocument } from '../types/content-document';
 import CaptureExtractedContent from '../components/CaptureExtractedContent';
-import AttentionScorecard from '../components/AttentionScorecard';
-import CaptureLearningExpectations from '../components/CaptureLearningExpectations';
+import CaptureAiInsights from '../components/CaptureAiInsights';
 import './CaptureDetailPage.css';
 
 const STATUS_LABELS: Record<CaptureStatus, string> = {
@@ -52,12 +55,25 @@ const CaptureHero: React.FC<{
   capture: Capture;
   onOpenLink?: () => void;
   openLinkLabel?: string;
-}> = ({ capture, onOpenLink, openLinkLabel }) => {
+  onRetryThumbnail?: () => void;
+  thumbnailRetryBusy?: boolean;
+}> = ({ capture, onOpenLink, openLinkLabel, onRetryThumbnail, thumbnailRetryBusy = false }) => {
   const previewUrl = useCapturePreview(capture);
   const [imageBroken, setImageBroken] = useState(false);
+  const [imageExpanded, setImageExpanded] = useState(false);
   const isUrlCapture = capture.type === 'url' && !!capture.url;
+  const isPrimaryImage =
+    (capture.type === 'file' && isImageMime(capture.source)) ||
+    (capture.type === 'note' &&
+      !!capture.content &&
+      isImagePath(capture.content.trim().split('\n')[0]));
   const showPlaceholder = isUrlCapture && (!previewUrl || imageBroken);
   const isInstagram = detectLinkPlatform(capture.url ?? '') === 'instagram';
+
+  useEffect(() => {
+    setImageBroken(false);
+    setImageExpanded(false);
+  }, [capture.id, capture.thumbnail]);
 
   if (!previewUrl && !isUrlCapture) {
     return null;
@@ -80,35 +96,94 @@ const CaptureHero: React.FC<{
               ? 'Instagram sometimes hides reels from scrapers. Your link is saved — open it to watch.'
               : 'We could not load a preview image. Your link is still saved.'}
           </p>
-          {onOpenLink && (
-            <IonButton className="capture-detail__hero-cta" fill="solid" onClick={onOpenLink}>
-              <IonIcon icon={openOutline} slot="start" />
-              {openLinkLabel ?? (isInstagram ? 'Open in Instagram' : 'Open link')}
-            </IonButton>
-          )}
+          <div className="capture-detail__hero-actions">
+            {onRetryThumbnail && (
+              <IonButton
+                className="capture-detail__hero-retry"
+                fill="solid"
+                disabled={thumbnailRetryBusy}
+                onClick={onRetryThumbnail}
+              >
+                {thumbnailRetryBusy ? (
+                  <IonSpinner name="crescent" />
+                ) : (
+                  <IonIcon icon={refreshOutline} slot="start" />
+                )}
+                Retry preview
+              </IonButton>
+            )}
+            {onOpenLink && (
+              <IonButton className="capture-detail__hero-cta" fill="solid" onClick={onOpenLink}>
+                <IonIcon icon={openOutline} slot="start" />
+                {openLinkLabel ?? (isInstagram ? 'Open in Instagram' : 'Open link')}
+              </IonButton>
+            )}
+          </div>
         </div>
       </div>
     );
   }
 
+  const heroClassName = [
+    'capture-detail__hero',
+    'capture-detail__hero--expandable',
+    isPrimaryImage ? 'capture-detail__hero--primary-image' : null
+  ]
+    .filter(Boolean)
+    .join(' ');
+
   return (
-    <div className="capture-detail__hero">
-      <img
-        src={previewUrl!}
-        alt={getCaptureDisplayTitle(capture)}
-        onError={() => setImageBroken(true)}
-      />
-      {onOpenLink && (
-        <IonButton
-          className="capture-detail__hero-open"
-          fill="solid"
-          aria-label={openLinkLabel ?? 'Open link'}
-          onClick={onOpenLink}
+    <>
+      <div className={heroClassName}>
+        <button
+          type="button"
+          className="capture-detail__hero-image-button"
+          aria-label="View full image"
+          onClick={() => setImageExpanded(true)}
         >
-          <IonIcon icon={openOutline} slot="icon-only" />
-        </IonButton>
-      )}
-    </div>
+          <img
+            src={previewUrl!}
+            alt={getCaptureDisplayTitle(capture)}
+            onError={() => setImageBroken(true)}
+          />
+          <span className="capture-detail__hero-expand-hint" aria-hidden="true">
+            <IonIcon icon={expandOutline} />
+          </span>
+        </button>
+        {onOpenLink && (
+          <IonButton
+            className="capture-detail__hero-open"
+            fill="solid"
+            aria-label={openLinkLabel ?? 'Open link'}
+            onClick={onOpenLink}
+          >
+            <IonIcon icon={openOutline} slot="icon-only" />
+          </IonButton>
+        )}
+      </div>
+
+      <IonModal
+        isOpen={imageExpanded}
+        className="capture-detail__image-modal"
+        onDidDismiss={() => setImageExpanded(false)}
+      >
+        <IonHeader>
+          <IonToolbar>
+            <IonTitle>{getCaptureDisplayTitle(capture)}</IonTitle>
+            <IonButtons slot="end">
+              <IonButton aria-label="Close" onClick={() => setImageExpanded(false)}>
+                <IonIcon icon={closeOutline} slot="icon-only" />
+              </IonButton>
+            </IonButtons>
+          </IonToolbar>
+        </IonHeader>
+        <IonContent className="capture-detail__image-modal-content">
+          <div className="capture-detail__image-modal-frame">
+            <img src={previewUrl!} alt={getCaptureDisplayTitle(capture)} />
+          </div>
+        </IonContent>
+      </IonModal>
+    </>
   );
 };
 
@@ -122,6 +197,7 @@ const CaptureDetailPage: React.FC = () => {
   const [document, setDocument] = useState<ContentDocument | null>(null);
   const [analysis, setAnalysis] = useState<AIAnalysis | null>(null);
   const [extractionBusy, setExtractionBusy] = useState(false);
+  const [thumbnailRetryBusy, setThumbnailRetryBusy] = useState(false);
   const [analysisBusy, setAnalysisBusy] = useState(false);
   const { removeCapture, updateCaptureTitle, updateCaptureStatus } = useCaptureStore();
 
@@ -157,7 +233,11 @@ const CaptureDetailPage: React.FC = () => {
       processing?.extractionStatus === 'pending' ||
       processing?.extractionStatus === 'processing' ||
       processing?.analysisStatus === 'pending' ||
-      processing?.analysisStatus === 'processing';
+      processing?.analysisStatus === 'processing' ||
+      processing?.understandStatus === 'processing' ||
+      processing?.classifyStatus === 'processing' ||
+      processing?.enrichStatus === 'processing' ||
+      processing?.evaluateStatus === 'processing';
 
     if (!isActive) {
       return;
@@ -168,7 +248,7 @@ const CaptureDetailPage: React.FC = () => {
     }, 2000);
 
     return () => window.clearInterval(interval);
-  }, [id, capture, processing?.extractionStatus, processing?.analysisStatus]);
+  }, [id, capture, processing?.extractionStatus, processing?.analysisStatus, processing?.understandStatus, processing?.classifyStatus, processing?.enrichStatus, processing?.evaluateStatus]);
 
   const deleteItem = async () => {
     if (!capture) {
@@ -224,6 +304,28 @@ const CaptureDetailPage: React.FC = () => {
     } catch (error) {
       console.error('Failed to update capture status', error);
       setToastMessage('Could not update status.');
+    }
+  };
+
+  const handleRetryThumbnail = async () => {
+    if (!capture) {
+      return;
+    }
+
+    setThumbnailRetryBusy(true);
+    try {
+      const result = await refreshCaptureThumbnail(capture.id);
+      if (result.capture) {
+        setCapture(result.capture);
+      }
+      setToastMessage(result.userMessage);
+    } catch (error) {
+      console.error('Failed to refresh capture thumbnail', error);
+      setToastMessage(
+        error instanceof Error ? error.message : 'Could not refresh preview image. Try again.'
+      );
+    } finally {
+      setThumbnailRetryBusy(false);
     }
   };
 
@@ -297,7 +399,7 @@ const CaptureDetailPage: React.FC = () => {
     processing?.extractionStatus === 'failed' || processing?.extractionStatus === 'skipped';
   const hasAnalyzableContent = !!document && hasUsableExtractedContent(document);
   // Only show triage UI when we actually have content to judge — not for blocked Instagram/etc.
-  const showAttention = hasAnalyzableContent && !extractionBlocked;
+  const showInsights = hasAnalyzableContent && !extractionBlocked;
 
   const captureLink = getCaptureLink(capture);
   const badge = getCaptureSourceBadge(capture);
@@ -333,6 +435,8 @@ const CaptureDetailPage: React.FC = () => {
             capture={capture}
             onOpenLink={captureLink ? handleOpenLink : undefined}
             openLinkLabel={captureLink ? getOpenLinkLabel(captureLink) : undefined}
+            onRetryThumbnail={capture.type === 'url' && capture.url ? handleRetryThumbnail : undefined}
+            thumbnailRetryBusy={thumbnailRetryBusy}
           />
 
           {/* {captureLink && (
@@ -375,21 +479,13 @@ const CaptureDetailPage: React.FC = () => {
                 onOpenLink={captureLink ? handleOpenLink : undefined}
                 openLinkLabel={captureLink ? getOpenLinkLabel(captureLink) : undefined}
               />
-              {showAttention && (
-                <>
-                  <AttentionScorecard
-                    processing={processing}
-                    analysis={analysis}
-                    busy={analysisBusy}
-                    onAnalyze={handleAnalyze}
-                  />
-                  {analysis && (
-                    <CaptureLearningExpectations
-                      youWillGet={analysis.viewerExpectation.youWillGet}
-                      youWillNotGet={analysis.viewerExpectation.youWillNotGet}
-                    />
-                  )}
-                </>
+              {showInsights && (
+                <CaptureAiInsights
+                  processing={processing}
+                  analysis={analysis}
+                  busy={analysisBusy}
+                  onAnalyze={handleAnalyze}
+                />
               )}
             </>
           )}

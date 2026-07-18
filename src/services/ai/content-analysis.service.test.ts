@@ -8,8 +8,15 @@ vi.mock('./provider-registry', () => ({
   getFallbackProvider: vi.fn()
 }));
 
-vi.mock('../../database/ai-analysis.repository', () => ({
-  getAiAnalysis: vi.fn().mockResolvedValue(null)
+vi.mock('../../database/ai-pipeline.repository', () => ({
+  getComposedAnalysis: vi.fn().mockResolvedValue(null),
+  getPipelineStages: vi.fn().mockResolvedValue({
+    understand: null,
+    classify: null,
+    enrich: null,
+    evaluate: null
+  }),
+  savePipelineStages: vi.fn().mockResolvedValue(undefined)
 }));
 
 vi.mock('./prompt-builder', () => ({
@@ -39,13 +46,19 @@ vi.mock('./response-parser', () => ({
 }));
 
 import { getActiveProvider, getFallbackProvider } from './provider-registry';
-import { getAiAnalysis } from '../../database/ai-analysis.repository';
+import { getComposedAnalysis, getPipelineStages } from '../../database/ai-pipeline.repository';
 import { buildAnalysisPrompt } from './prompt-builder';
 
 describe('content-analysis.service', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(getAiAnalysis).mockResolvedValue(null);
+    vi.mocked(getComposedAnalysis).mockResolvedValue(null);
+    vi.mocked(getPipelineStages).mockResolvedValue({
+      understand: null,
+      classify: null,
+      enrich: null,
+      evaluate: null
+    });
     vi.mocked(getFallbackProvider).mockReturnValue(null);
   });
 
@@ -100,26 +113,42 @@ describe('content-analysis.service', () => {
   });
 
   it('returns cached analysis when force is false', async () => {
-    const cached = {
-      schemaVersion: CURRENT_ANALYSIS_SCHEMA_VERSION,
-      captureId: 'capture-1',
-      lens: 'technology' as const,
-      summary: 'Cached',
-      topics: [],
-      contentType: 'other' as const,
-      targetAudience: [],
-      viewerExpectation: { youWillGet: [], youWillNotGet: [] },
-      expectedValue: 'medium' as const,
-      potentialDisappointment: 'medium' as const,
-      lensFields: {},
-      recommendation: 'Cached recommendation',
-      estimatedReadingTime: null,
-      estimatedWatchTime: null,
-      reasoning: '',
-      confidence: 0.9,
-      analyzedAt: Date.now()
-    };
-    vi.mocked(getAiAnalysis).mockResolvedValue(cached);
+    vi.mocked(getPipelineStages).mockResolvedValue({
+      understand: {
+        schemaVersion: 1,
+        captureId: 'capture-1',
+        summary: 'Cached',
+        topics: [],
+        targetAudience: [],
+        estimatedReadingTime: null,
+        estimatedWatchTime: null,
+        completedAt: 1_700_000_000_000
+      },
+      classify: {
+        schemaVersion: 1,
+        captureId: 'capture-1',
+        lens: 'technology',
+        contentType: 'other',
+        completedAt: 1_700_000_000_000
+      },
+      enrich: {
+        schemaVersion: 1,
+        captureId: 'capture-1',
+        viewerExpectation: { youWillGet: [], youWillNotGet: [] },
+        lensFields: {},
+        completedAt: 1_700_000_000_000
+      },
+      evaluate: {
+        schemaVersion: 1,
+        captureId: 'capture-1',
+        expectedValue: 'medium',
+        potentialDisappointment: 'medium',
+        recommendation: 'Cached recommendation',
+        reasoning: '',
+        confidence: 0.9,
+        completedAt: 1_700_000_000_000
+      }
+    });
 
     const result = await analyze({
       captureId: 'capture-1',
@@ -127,7 +156,8 @@ describe('content-analysis.service', () => {
       articleText: 'Some note content',
       extractedAt: Date.now()
     });
-    expect(result).toBe(cached);
+    expect(result.summary).toBe('Cached');
+    expect(result.recommendation).toBe('Cached recommendation');
     expect(getActiveProvider).not.toHaveBeenCalled();
   });
 

@@ -1,10 +1,25 @@
 import { AIAnalysis } from '../../types/ai-analysis';
+import {
+  composeAnalysisFromStages,
+  isPipelineComplete,
+  PipelineStageResults,
+  splitAnalysisIntoStages
+} from '../../types/ai-pipeline-stages';
 import { ContentDocument } from '../../types/content-document';
-import { getAiAnalysis } from '../../database/ai-analysis.repository';
+import {
+  getComposedAnalysis,
+  getPipelineStages,
+  savePipelineStages
+} from '../../database/ai-pipeline.repository';
 import { buildAnalysisPrompt } from './prompt-builder';
 import { getActiveProvider, getFallbackProvider } from './provider-registry';
 import { parseAnalysisResponse } from './response-parser';
 import { AIProvider } from './ai-provider.types';
+
+export interface AnalysisPipelineResult {
+  stages: PipelineStageResults;
+  analysis: AIAnalysis;
+}
 
 const completeWithProvider = async (
   provider: AIProvider,
@@ -14,17 +29,7 @@ const completeWithProvider = async (
   return provider.complete(prompt);
 };
 
-export const analyze = async (
-  document: ContentDocument,
-  options?: { force?: boolean }
-): Promise<AIAnalysis> => {
-  if (!options?.force) {
-    const cached = await getAiAnalysis(document.captureId);
-    if (cached) {
-      return cached;
-    }
-  }
-
+const runSinglePassAnalysis = async (document: ContentDocument): Promise<AIAnalysis> => {
   const primary = getActiveProvider();
   const fallback = getFallbackProvider(primary.id === 'null' ? undefined : primary.id);
 
@@ -49,5 +54,47 @@ export const analyze = async (
   }
 };
 
-/** @deprecated Use `analyze` instead. */
+/**
+ * Runs Understand → Classify → Enrich → Evaluate.
+ * Today all four stages share one LLM call; each stage is persisted separately.
+ */
+export const runAnalysisPipeline = async (
+  document: ContentDocument,
+  options?: { force?: boolean }
+): Promise<AnalysisPipelineResult> => {
+  if (!options?.force) {
+    const cachedStages = await getPipelineStages(document.captureId);
+    if (isPipelineComplete(cachedStages)) {
+      return {
+        stages: cachedStages,
+        analysis: composeAnalysisFromStages(cachedStages)!
+      };
+    }
+
+    const cachedAnalysis = await getComposedAnalysis(document.captureId);
+    if (cachedAnalysis) {
+      return {
+        stages: splitAnalysisIntoStages(cachedAnalysis),
+        analysis: cachedAnalysis
+      };
+    }
+  }
+
+  const analysis = await runSinglePassAnalysis(document);
+  const stages = splitAnalysisIntoStages(analysis);
+  await savePipelineStages(stages);
+
+  return { stages, analysis };
+};
+
+/** @deprecated Use `runAnalysisPipeline` instead. */
+export const analyze = async (
+  document: ContentDocument,
+  options?: { force?: boolean }
+): Promise<AIAnalysis> => {
+  const result = await runAnalysisPipeline(document, options);
+  return result.analysis;
+};
+
+/** @deprecated Use `runAnalysisPipeline` instead. */
 export const analyzeContent = analyze;

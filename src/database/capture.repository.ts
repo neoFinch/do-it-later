@@ -1,5 +1,12 @@
 import { Capture, CaptureStatus } from '../types/capture';
 import { canonicalizeCaptureUrl } from '../services/link.service';
+import {
+  buildCaptureSearchContext,
+  buildCaptureSqlSearchClause,
+  buildCaptureSqlSearchParams,
+  matchesCaptureSearch,
+  normalizeSearchQuery
+} from '../services/capture-search.service';
 import { getDatabase, initDatabase } from './sqlite';
 import { Capacitor } from '@capacitor/core';
 
@@ -56,17 +63,39 @@ const writeStorage = (items: Capture[]) => {
 const sortCaptures = (items: Capture[]): Capture[] =>
   items.sort((a, b) => b.createdAt - a.createdAt);
 
-const matchesSearch = (capture: Capture, query: string): boolean => {
-  const q = query.trim().toLowerCase();
-  if (!q) {
-    return true;
+const matchesCaptureSearchQuery = (capture: Capture, query: string): boolean =>
+  matchesCaptureSearch(buildCaptureSearchContext({ capture }), query);
+
+export const searchCaptures = async (query: string, status?: CaptureStatus): Promise<Capture[]> => {
+  const normalizedQuery = normalizeSearchQuery(query);
+  if (!normalizedQuery) {
+    return listCaptures(status);
   }
 
-  const title = (capture.title ?? '').toLowerCase();
-  const content = (capture.content ?? '').toLowerCase();
-  const url = (capture.url ?? '').toLowerCase();
-  const source = (capture.source ?? '').toLowerCase();
-  return title.includes(q) || content.includes(q) || url.includes(q) || source.includes(q);
+  if (isWeb) {
+    const items = readStorage();
+    const filtered = items.filter((item) => {
+      if (status && item.status !== status) {
+        return false;
+      }
+      return matchesCaptureSearchQuery(item, query);
+    });
+    return sortCaptures(filtered);
+  }
+
+  const db = await getDatabase();
+  const searchClause = buildCaptureSqlSearchClause();
+  const result = status
+    ? await db.query(
+        `SELECT * FROM captures WHERE status = ? AND (${searchClause}) ORDER BY createdAt DESC;`,
+        buildCaptureSqlSearchParams(query, status)
+      )
+    : await db.query(
+        `SELECT * FROM captures WHERE ${searchClause} ORDER BY createdAt DESC;`,
+        buildCaptureSqlSearchParams(query)
+      );
+  const values = result.values ?? [];
+  return values.map(mapRowToCapture);
 };
 
 export const initializeCaptureTable = async (): Promise<void> => {
@@ -179,33 +208,6 @@ export const deleteCapture = async (id: string): Promise<void> => {
 
   const db = await getDatabase();
   await db.run('DELETE FROM captures WHERE id = ?;', [id], true);
-};
-
-export const searchCaptures = async (query: string, status?: CaptureStatus): Promise<Capture[]> => {
-  if (isWeb) {
-    const items = readStorage();
-    const filtered = items.filter((item) => {
-      if (status && item.status !== status) {
-        return false;
-      }
-      return matchesSearch(item, query);
-    });
-    return sortCaptures(filtered);
-  }
-
-  const db = await getDatabase();
-  const normalized = `%${query.trim().toLowerCase()}%`;
-  const result = status
-    ? await db.query(
-        'SELECT * FROM captures WHERE status = ? AND (LOWER(title) LIKE ? OR LOWER(content) LIKE ? OR LOWER(url) LIKE ? OR LOWER(source) LIKE ?) ORDER BY createdAt DESC;',
-        [status, normalized, normalized, normalized, normalized]
-      )
-    : await db.query(
-        'SELECT * FROM captures WHERE LOWER(title) LIKE ? OR LOWER(content) LIKE ? OR LOWER(url) LIKE ? OR LOWER(source) LIKE ? ORDER BY createdAt DESC;',
-        [normalized, normalized, normalized, normalized]
-      );
-  const values = result.values ?? [];
-  return values.map(mapRowToCapture);
 };
 
 export const countCapturesByStatus = async (): Promise<Record<CaptureStatus, number>> => {

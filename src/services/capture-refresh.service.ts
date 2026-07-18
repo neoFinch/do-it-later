@@ -49,6 +49,76 @@ const buildUserMessage = (params: {
   return 'Could not refresh this capture. Check your connection and try again.';
 };
 
+export interface CaptureThumbnailRefreshResult {
+  capture: Capture | null;
+  thumbnailPresent: boolean;
+  userMessage: string;
+}
+
+/**
+ * Re-fetch only the preview image (metadata thumbnail) without re-extracting content.
+ */
+export const refreshCaptureThumbnail = async (captureId: string): Promise<CaptureThumbnailRefreshResult> => {
+  const before = await getCapture(captureId);
+  if (!before) {
+    return {
+      capture: null,
+      thumbnailPresent: false,
+      userMessage: 'Capture not found.'
+    };
+  }
+
+  if (before.type !== 'url' || !before.url) {
+    return {
+      capture: before,
+      thumbnailPresent: !!before.thumbnail,
+      userMessage: 'Preview retry is only available for URL captures.'
+    };
+  }
+
+  const enrich = await enrichUrlCapture(before.id, before.url, before.title, {
+    force: true,
+    thumbnailOnly: true
+  });
+
+  let capture = await getCapture(captureId);
+
+  if (!capture?.thumbnail) {
+    const { getContentDocument } = await import('../database/content-document.repository');
+    const { materializeCaptureThumbnail, updateCapture, patchInboxCaptureIfInitialized } = await import(
+      './capture.service'
+    );
+    const document = await getContentDocument(captureId);
+
+    if (document?.thumbnail) {
+      const thumbnail = await materializeCaptureThumbnail(captureId, before.url, document.thumbnail);
+      if (thumbnail) {
+        await updateCapture(captureId, { thumbnail });
+        patchInboxCaptureIfInitialized(captureId, { thumbnail });
+        capture = await getCapture(captureId);
+      }
+    }
+  }
+
+  const thumbnailPresent = !!capture?.thumbnail;
+
+  if (thumbnailPresent) {
+    return {
+      capture,
+      thumbnailPresent: true,
+      userMessage: 'Preview image updated.'
+    };
+  }
+
+  return {
+    capture,
+    thumbnailPresent: false,
+    userMessage:
+      enrich.error ??
+      'Could not fetch a preview image. Check your connection and try again.'
+  };
+};
+
 /**
  * Re-fetch URL metadata (thumbnail/title) and force re-extract content.
  * Used from capture detail when Instagram/share enrichment failed or was empty.

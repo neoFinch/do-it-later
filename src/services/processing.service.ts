@@ -1,4 +1,4 @@
-import { deleteAiAnalysis, getAiAnalysis, saveAiAnalysis } from '../database/ai-analysis.repository';
+import { deleteAiAnalysis, getAiAnalysis } from '../database/ai-analysis.repository';
 import { deleteContentDocument, getContentDocument } from '../database/content-document.repository';
 import {
   deleteCaptureProcessing,
@@ -6,8 +6,15 @@ import {
   listPendingProcessing,
   saveCaptureProcessing
 } from '../database/processing.repository';
-import { CaptureProcessing, PipelineStatus } from '../types/capture-processing';
-import { analyze } from './ai/content-analysis.service';
+import {
+  ANALYSIS_STAGES,
+  AnalysisStage,
+  CaptureProcessing,
+  createDefaultProcessingState,
+  deriveAnalysisStatus,
+  PipelineStatus
+} from '../types/capture-processing';
+import { runAnalysisPipeline } from './ai/content-analysis.service';
 import { isActiveProviderAvailable, shouldAutoAnalyze } from './ai/provider-registry';
 import { listCaptures } from './capture.service';
 import { extractCapture, getCaptureExtraction, processStaleExtractions } from './extraction.service';
@@ -16,14 +23,8 @@ const activeAnalysisJobs = new Set<string>();
 
 const now = (): number => Date.now();
 
-const createProcessingState = (captureId: string): CaptureProcessing => ({
-  captureId,
-  extractionStatus: 'pending',
-  analysisStatus: 'pending',
-  extractionError: null,
-  analysisError: null,
-  updatedAt: now()
-});
+const createProcessingState = (captureId: string): CaptureProcessing =>
+  createDefaultProcessingState(captureId, now());
 
 const updateProcessing = async (
   captureId: string,
@@ -35,8 +36,37 @@ const updateProcessing = async (
     ...updates,
     updatedAt: now()
   };
+  next.analysisStatus = deriveAnalysisStatus(next);
   await saveCaptureProcessing(next);
   return next;
+};
+
+const setStageStatus = async (
+  captureId: string,
+  stage: AnalysisStage,
+  status: PipelineStatus,
+  error?: string | null
+): Promise<void> => {
+  const statusKey = `${stage}Status` as const;
+  const errorKey = `${stage}Error` as const;
+  await updateProcessing(captureId, {
+    [statusKey]: status,
+    [errorKey]: error ?? null
+  });
+};
+
+const setAllStageStatuses = async (
+  captureId: string,
+  status: PipelineStatus,
+  error?: string | null
+): Promise<void> => {
+  const updates: Partial<CaptureProcessing> = {};
+  for (const stage of ANALYSIS_STAGES) {
+    updates[`${stage}Status`] = status;
+    updates[`${stage}Error`] = error ?? null;
+  }
+  updates.analysisError = error ?? null;
+  await updateProcessing(captureId, updates);
 };
 
 const setAnalysisStatus = async (
@@ -44,10 +74,7 @@ const setAnalysisStatus = async (
   status: PipelineStatus,
   error?: string | null
 ): Promise<void> => {
-  await updateProcessing(captureId, {
-    analysisStatus: status,
-    analysisError: error ?? null
-  });
+  await setAllStageStatuses(captureId, status, error);
 };
 
 export const queueCaptureProcessing = (captureId: string): void => {
@@ -83,19 +110,25 @@ export const analyzeCapture = async (captureId: string, options?: { force?: bool
     }
 
     if (!shouldAutoAnalyze() && !force) {
-      await setAnalysisStatus(
-        captureId,
-        isActiveProviderAvailable() ? 'pending' : 'skipped',
-        isActiveProviderAvailable() ? null : 'Configure an AI provider in Settings to analyze content.'
-      );
+      const skippedStatus: PipelineStatus = isActiveProviderAvailable() ? 'pending' : 'skipped';
+      const skippedMessage = isActiveProviderAvailable()
+        ? null
+        : 'Configure an AI provider in Settings to analyze content.';
+      await setAnalysisStatus(captureId, skippedStatus, skippedMessage);
       return;
     }
 
     await setAnalysisStatus(captureId, 'processing', null);
     try {
-      const analysis = await analyze(document, { force });
-      await saveAiAnalysis(analysis);
-      await setAnalysisStatus(captureId, 'completed', null);
+      for (const stage of ANALYSIS_STAGES) {
+        await setStageStatus(captureId, stage, 'processing', null);
+      }
+
+      await runAnalysisPipeline(document, { force });
+
+      for (const stage of ANALYSIS_STAGES) {
+        await setStageStatus(captureId, stage, 'completed', null);
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       await setAnalysisStatus(captureId, 'failed', message);
