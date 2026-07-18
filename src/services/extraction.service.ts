@@ -4,7 +4,7 @@ import {
   getCaptureProcessing,
   saveCaptureProcessing
 } from '../database/processing.repository';
-import { CaptureProcessing, PipelineStatus } from '../types/capture-processing';
+import { CaptureProcessing, PipelineStatus, createDefaultProcessingState } from '../types/capture-processing';
 import { ContentDocument } from '../types/content-document';
 import { getCapture } from './capture.service';
 import { extractCaptureContent } from './extractors/content-extractor.service';
@@ -13,14 +13,8 @@ const activeJobs = new Set<string>();
 
 const now = (): number => Date.now();
 
-const createProcessingState = (captureId: string): CaptureProcessing => ({
-  captureId,
-  extractionStatus: 'pending',
-  analysisStatus: 'pending',
-  extractionError: null,
-  analysisError: null,
-  updatedAt: now()
-});
+const createProcessingState = (captureId: string): CaptureProcessing =>
+  createDefaultProcessingState(captureId, now());
 
 export const ensureProcessingState = async (captureId: string): Promise<CaptureProcessing> => {
   const existing = await getCaptureProcessing(captureId);

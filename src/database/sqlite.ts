@@ -2,7 +2,7 @@ import { Capacitor } from '@capacitor/core';
 import { CapacitorSQLite, SQLiteConnection, SQLiteDBConnection } from '@capacitor-community/sqlite';
 
 const DATABASE_NAME = 'capture_inbox';
-const DATABASE_VERSION = 5;
+const DATABASE_VERSION = 6;
 const DATABASE_MODE = 'no-encryption';
 
 let sqliteConnection: SQLiteConnection | null = null;
@@ -79,9 +79,68 @@ CREATE TABLE IF NOT EXISTS capture_processing (
   captureId TEXT PRIMARY KEY NOT NULL,
   extractionStatus TEXT NOT NULL DEFAULT 'pending',
   analysisStatus TEXT NOT NULL DEFAULT 'pending',
+  understandStatus TEXT NOT NULL DEFAULT 'pending',
+  classifyStatus TEXT NOT NULL DEFAULT 'pending',
+  enrichStatus TEXT NOT NULL DEFAULT 'pending',
+  evaluateStatus TEXT NOT NULL DEFAULT 'pending',
   extractionError TEXT,
   analysisError TEXT,
+  understandError TEXT,
+  classifyError TEXT,
+  enrichError TEXT,
+  evaluateError TEXT,
   updatedAt INTEGER NOT NULL,
+  FOREIGN KEY (captureId) REFERENCES captures(id) ON DELETE CASCADE
+);
+`;
+
+const createAiUnderstandTable = `
+CREATE TABLE IF NOT EXISTS ai_understand (
+  captureId TEXT PRIMARY KEY NOT NULL,
+  schemaVersion INTEGER NOT NULL DEFAULT 1,
+  summary TEXT NOT NULL,
+  topics TEXT NOT NULL,
+  targetAudience TEXT NOT NULL,
+  estimatedReadingTime INTEGER,
+  estimatedWatchTime INTEGER,
+  completedAt INTEGER NOT NULL,
+  FOREIGN KEY (captureId) REFERENCES captures(id) ON DELETE CASCADE
+);
+`;
+
+const createAiClassifyTable = `
+CREATE TABLE IF NOT EXISTS ai_classify (
+  captureId TEXT PRIMARY KEY NOT NULL,
+  schemaVersion INTEGER NOT NULL DEFAULT 1,
+  lens TEXT NOT NULL,
+  contentType TEXT NOT NULL,
+  completedAt INTEGER NOT NULL,
+  FOREIGN KEY (captureId) REFERENCES captures(id) ON DELETE CASCADE
+);
+`;
+
+const createAiEnrichTable = `
+CREATE TABLE IF NOT EXISTS ai_enrich (
+  captureId TEXT PRIMARY KEY NOT NULL,
+  schemaVersion INTEGER NOT NULL DEFAULT 1,
+  viewerExpectationYouWillGet TEXT NOT NULL DEFAULT '[]',
+  viewerExpectationYouWillNotGet TEXT NOT NULL DEFAULT '[]',
+  lensFields TEXT NOT NULL DEFAULT '{}',
+  completedAt INTEGER NOT NULL,
+  FOREIGN KEY (captureId) REFERENCES captures(id) ON DELETE CASCADE
+);
+`;
+
+const createAiEvaluateTable = `
+CREATE TABLE IF NOT EXISTS ai_evaluate (
+  captureId TEXT PRIMARY KEY NOT NULL,
+  schemaVersion INTEGER NOT NULL DEFAULT 1,
+  expectedValue TEXT NOT NULL DEFAULT 'medium',
+  potentialDisappointment TEXT NOT NULL DEFAULT 'medium',
+  recommendation TEXT NOT NULL DEFAULT '',
+  reasoning TEXT NOT NULL DEFAULT '',
+  confidence REAL NOT NULL,
+  completedAt INTEGER NOT NULL,
   FOREIGN KEY (captureId) REFERENCES captures(id) ON DELETE CASCADE
 );
 `;
@@ -98,6 +157,120 @@ const migrateV2Tables = async (db: SQLiteDBConnection): Promise<void> => {
   await db.execute(createContentDocumentTable, false, false);
   await db.execute(createAiAnalysisTable, false, false);
   await db.execute(createCaptureProcessingTable, false, false);
+};
+
+const migrateAiPipelineV6 = async (db: SQLiteDBConnection): Promise<void> => {
+  await db.execute(createAiUnderstandTable, false, false);
+  await db.execute(createAiClassifyTable, false, false);
+  await db.execute(createAiEnrichTable, false, false);
+  await db.execute(createAiEvaluateTable, false, false);
+
+  const understandInfo = await db.query('PRAGMA table_info(ai_understand);');
+  const understandColumns = (understandInfo.values ?? []).map((row: { name?: string }) => row.name);
+  if (understandColumns.length === 0) {
+    return;
+  }
+
+  const existingUnderstand = await db.query('SELECT captureId FROM ai_understand LIMIT 1;');
+  if ((existingUnderstand.values ?? []).length > 0) {
+    return;
+  }
+
+  const legacyRows = await db.query('SELECT * FROM ai_analysis;');
+  for (const row of legacyRows.values ?? []) {
+    const record = row as Record<string, unknown>;
+    const captureId = String(record.captureId);
+    const analyzedAt = Number(record.analyzedAt ?? Date.now());
+
+    await db.run(
+      `INSERT OR IGNORE INTO ai_understand
+        (captureId, schemaVersion, summary, topics, targetAudience, estimatedReadingTime, estimatedWatchTime, completedAt)
+        VALUES (?, 1, ?, ?, ?, ?, ?, ?);`,
+      [
+        captureId,
+        String(record.summary ?? ''),
+        String(record.topics ?? '[]'),
+        String(record.targetAudience ?? '[]'),
+        record.estimatedReadingTime != null ? Number(record.estimatedReadingTime) : null,
+        record.estimatedWatchTime != null ? Number(record.estimatedWatchTime) : null,
+        analyzedAt
+      ],
+      true
+    );
+
+    await db.run(
+      `INSERT OR IGNORE INTO ai_classify
+        (captureId, schemaVersion, lens, contentType, completedAt)
+        VALUES (?, 1, ?, ?, ?);`,
+      [captureId, String(record.lens ?? 'general'), String(record.contentType ?? 'other'), analyzedAt],
+      true
+    );
+
+    await db.run(
+      `INSERT OR IGNORE INTO ai_enrich
+        (captureId, schemaVersion, viewerExpectationYouWillGet, viewerExpectationYouWillNotGet, lensFields, completedAt)
+        VALUES (?, 1, ?, ?, ?, ?);`,
+      [
+        captureId,
+        String(record.viewerExpectationYouWillGet ?? record.viewerExpectationYouWillLearn ?? '[]'),
+        String(record.viewerExpectationYouWillNotGet ?? record.viewerExpectationYouWillNotLearn ?? '[]'),
+        String(record.lensFields ?? '{}'),
+        analyzedAt
+      ],
+      true
+    );
+
+    await db.run(
+      `INSERT OR IGNORE INTO ai_evaluate
+        (captureId, schemaVersion, expectedValue, potentialDisappointment, recommendation, reasoning, confidence, completedAt)
+        VALUES (?, 1, ?, ?, ?, ?, ?, ?);`,
+      [
+        captureId,
+        String(record.expectedValue ?? record.expectedLearning ?? 'medium'),
+        String(record.potentialDisappointment ?? 'medium'),
+        String(record.recommendation ?? ''),
+        String(record.reasoning ?? ''),
+        Number(record.confidence ?? 0),
+        analyzedAt
+      ],
+      true
+    );
+  }
+};
+
+const migrateCaptureProcessingV6 = async (db: SQLiteDBConnection): Promise<void> => {
+  const tableInfo = await db.query('PRAGMA table_info(capture_processing);');
+  const columns = (tableInfo.values ?? []).map((row: { name?: string }) => row.name).filter(Boolean) as string[];
+
+  if (columns.length === 0) {
+    return;
+  }
+
+  const addProcessingColumn = async (name: string, ddl: string): Promise<void> => {
+    if (!columns.includes(name)) {
+      await db.execute(`ALTER TABLE capture_processing ADD COLUMN ${ddl};`, false, false);
+    }
+  };
+
+  await addProcessingColumn('understandStatus', "understandStatus TEXT NOT NULL DEFAULT 'pending'");
+  await addProcessingColumn('classifyStatus', "classifyStatus TEXT NOT NULL DEFAULT 'pending'");
+  await addProcessingColumn('enrichStatus', "enrichStatus TEXT NOT NULL DEFAULT 'pending'");
+  await addProcessingColumn('evaluateStatus', "evaluateStatus TEXT NOT NULL DEFAULT 'pending'");
+  await addProcessingColumn('understandError', 'understandError TEXT');
+  await addProcessingColumn('classifyError', 'classifyError TEXT');
+  await addProcessingColumn('enrichError', 'enrichError TEXT');
+  await addProcessingColumn('evaluateError', 'evaluateError TEXT');
+
+  await db.execute(
+    `UPDATE capture_processing
+     SET understandStatus = analysisStatus,
+         classifyStatus = analysisStatus,
+         enrichStatus = analysisStatus,
+         evaluateStatus = analysisStatus
+     WHERE analysisStatus IN ('completed', 'failed', 'skipped', 'processing');`,
+    false,
+    false
+  );
 };
 
 const migrateAiAnalysisV3 = async (db: SQLiteDBConnection): Promise<void> => {
@@ -324,6 +497,8 @@ const initializeOnce = async (allowReset: boolean): Promise<void> => {
     await migrateAiAnalysisV3(db);
     await migrateAiAnalysisV4(db);
     await migrateAiAnalysisV5(db);
+    await migrateAiPipelineV6(db);
+    await migrateCaptureProcessingV6(db);
   } catch (error) {
     await closeConnection();
     databaseReady = null;
