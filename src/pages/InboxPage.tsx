@@ -195,7 +195,7 @@ const InboxPage: React.FC = () => {
               fill="clear"
               color="tertiary"
               className="inbox-search-row__action"
-              aria-label={`Review inbox (${statusCounts.INBOX})`}
+              aria-label={`Start review (${statusCounts.INBOX} captures)`}
               onClick={() => history.push('/review')}
             >
               <IonIcon icon={playOutline} slot="icon-only" />
