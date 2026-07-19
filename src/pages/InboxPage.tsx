@@ -144,7 +144,7 @@ const InboxPage: React.FC = () => {
     <IonPage>
       <IonHeader>
         <IonToolbar>
-          <IonTitle className="app-brand-title">Later</IonTitle>
+          <IonTitle className="app-brand-title">Offload</IonTitle>
           <IonButtons slot="end">
             <IonButton color="medium" onClick={() => history.push('/settings')} aria-label="Data settings">
               <IonIcon icon={settingsOutline} slot="icon-only" />
@@ -177,7 +177,7 @@ const InboxPage: React.FC = () => {
       <IonContent fullscreen>
         <IonHeader collapse="condense">
           <IonToolbar>
-            <IonTitle size="large">Capture Inbox</IonTitle>
+            <IonTitle size="large">Inbox</IonTitle>
           </IonToolbar>
         </IonHeader>
         <IonRefresher slot="fixed" onIonRefresh={doRefresh}>
