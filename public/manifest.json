@@ -1,6 +1,6 @@
 {
-  "short_name": "Ionic App",
-  "name": "My Ionic App",
+  "short_name": "Offload",
+  "name": "Offload",
   "icons": [
     {
       "src": "assets/icon/favicon.png",
@@ -16,6 +16,6 @@
   ],
   "start_url": ".",
   "display": "standalone",
-  "theme_color": "#ffffff",
-  "background_color": "#ffffff"
+  "theme_color": "#F9F7F2",
+  "background_color": "#F9F7F2"
 }

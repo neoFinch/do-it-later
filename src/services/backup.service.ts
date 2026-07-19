@@ -224,7 +224,7 @@ const shareBackupFile = async (json: string, fileName: string, relativePath: str
   if (shareFileUrl.startsWith('file://')) {
     try {
       await Share.share({
-        title: 'Capture Inbox backup',
+        title: 'Offload backup',
         dialogTitle: 'Export captures',
         files: [shareFileUrl]
       });

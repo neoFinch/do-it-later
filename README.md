@@ -1,4 +1,4 @@
-# Capture Inbox (Later)
+# Offload
 
 Personal **Attention Operating System** — capture content from anywhere, understand it, and decide whether it deserves your time.
 
@@ -21,7 +21,7 @@ Parked and upcoming work. Order is approximate, not a commitment.
 - [ ] **File capture extraction** — currently skipped (“not supported yet”)
 - [ ] **Instagram / social extraction polish** — more chrome edge cases beyond the first cleanup pass; handle empty OG / blocked fetches gracefully _(partial: login-wall detection + retry messaging)_
 - [ ] **Local LLM hardening** — still experimental; works only on Gemini Nano / Apple Intelligence–capable devices; improve status UX and when to fall back
-- [ ] **App icon & splash screen** — proper branding assets for install / launch (currently missing)
+- [x] **App icon & splash screen** — Offload branding assets (`assets/branding/`, run `python3 scripts/generate-app-icons.py`)
 
 ### AI chat & search
 
