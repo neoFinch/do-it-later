@@ -12,7 +12,7 @@ import {
   IonTitle,
   IonToolbar
 } from '@ionic/react';
-import { arrowBackOutline, arrowForwardOutline, playOutline } from 'ionicons/icons';
+import { arrowBackOutline, arrowForwardOutline, checkmarkCircleOutline, playOutline } from 'ionicons/icons';
 import { useHistory } from 'react-router-dom';
 import ReviewSwipeCard from '../components/ReviewSwipeCard';
 import { listCaptures } from '../services/capture.service';
@@ -43,6 +43,7 @@ const ReviewQueuePage: React.FC = () => {
   const [busy, setBusy] = useState(false);
   const [stats, setStats] = useState<SessionStats>({ saved: 0, skipped: 0 });
   const [estimate, setEstimate] = useState<ReviewSessionEstimate | null>(null);
+  const [remainingEstimate, setRemainingEstimate] = useState<ReviewSessionEstimate | null>(null);
   const [consumeLabel, setConsumeLabel] = useState<string | null>(null);
 
   const loadQueue = useCallback(async () => {
@@ -101,12 +102,34 @@ const ReviewQueuePage: React.FC = () => {
     };
   }, [current?.id]);
 
-  const position = useMemo(() => {
-    if (initialTotal === 0 || !current) {
+  useEffect(() => {
+    if (phase !== 'reviewing' || activeQueue.length === 0) {
+      setRemainingEstimate(null);
+      return;
+    }
+
+    let cancelled = false;
+    const queueSnapshot = activeQueue;
+
+    void estimateReviewSession(queueSnapshot).then((sessionEstimate) => {
+      if (!cancelled) {
+        setRemainingEstimate(sessionEstimate);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [phase, activeQueue]);
+
+  const reviewedCount = useMemo(() => {
+    if (initialTotal === 0) {
       return 0;
     }
-    return initialTotal - activeQueue.length + 1;
-  }, [initialTotal, activeQueue.length, current]);
+    return initialTotal - activeQueue.length;
+  }, [initialTotal, activeQueue.length]);
+
+  const remainingCount = activeQueue.length;
 
   const removeCurrentFromActive = () => {
     setActiveQueue((prev) => prev.slice(1));
@@ -162,8 +185,10 @@ const ReviewQueuePage: React.FC = () => {
   };
 
   const startDeferredReview = () => {
-    setActiveQueue(deferredQueue);
+    const skipped = deferredQueue;
+    setActiveQueue(skipped);
     setDeferredQueue([]);
+    setInitialTotal(skipped.length);
     setPhase('reviewing');
   };
 
@@ -177,7 +202,7 @@ const ReviewQueuePage: React.FC = () => {
         <IonButtons slot="start">
           <IonBackButton defaultHref="/" />
         </IonButtons>
-        <IonTitle>Review</IonTitle>
+        <IonTitle>Daily Review</IonTitle>
       </IonToolbar>
     </IonHeader>
   );
@@ -201,17 +226,11 @@ const ReviewQueuePage: React.FC = () => {
         {header}
         <IonContent fullscreen className="ion-padding review-page">
           <div className="review-intro">
-            <IonText>
-              <h1 className="review-intro__title">Today&apos;s Review</h1>
-            </IonText>
-            <ul className="review-intro__stats">
-              <li>
-                {estimate.captureCount} capture{estimate.captureCount === 1 ? '' : 's'}
-              </li>
-            </ul>
-            <IonText color="medium">
-              <p className="review-intro__duration">This will take {estimate.durationLabel}.</p>
-            </IonText>
+            <h1 className="review-intro__title">Daily Review</h1>
+            <p className="review-intro__stats">
+              {estimate.captureCount} capture{estimate.captureCount === 1 ? '' : 's'} remaining
+            </p>
+            <p className="review-intro__duration">This will take {estimate.durationLabel}.</p>
 
             <IonButton expand="block" color="primary" className="review-intro__start" onClick={startReview}>
               <IonIcon icon={playOutline} slot="start" />
@@ -261,16 +280,30 @@ const ReviewQueuePage: React.FC = () => {
       <IonPage>
         {header}
         <IonContent fullscreen className="ion-padding review-page">
-          <div className="review-summary">
+          <div className="review-summary review-summary--complete">
+            <IonIcon icon={checkmarkCircleOutline} className="review-summary__icon" aria-hidden="true" />
             <IonText>
-              <h2 className="review-summary__title">{initialTotal === 0 ? 'Inbox is clear' : 'Review complete'}</h2>
+              <h2 className="review-summary__title">
+                {initialTotal === 0 ? 'Inbox is clear' : 'Daily review complete'}
+              </h2>
             </IonText>
             {initialTotal > 0 && (
-              <IonText color="medium">
-                <p className="review-summary__copy">
-                  Saved {stats.saved} · Skipped {stats.skipped}
-                </p>
-              </IonText>
+              <>
+                <IonText color="medium">
+                  <p className="review-summary__copy">
+                    You reviewed {initialTotal} capture{initialTotal === 1 ? '' : 's'}.
+                  </p>
+                </IonText>
+                <ul className="review-summary__stats">
+                  <li>Saved {stats.saved}</li>
+                  <li>Skipped {stats.skipped}</li>
+                </ul>
+                {stats.saved > 0 && (
+                  <IonText color="medium">
+                    <p className="review-summary__copy">Saved items are in Reviewed on the inbox.</p>
+                  </IonText>
+                )}
+              </>
             )}
             <IonButton expand="block" color="primary" onClick={exitToInbox}>
               Back to inbox
@@ -288,7 +321,15 @@ const ReviewQueuePage: React.FC = () => {
           <IonButtons slot="start">
             <IonBackButton defaultHref="/" />
           </IonButtons>
-          <IonTitle>Review</IonTitle>
+          <IonTitle>
+            <div className="review-session-title">
+              <span className="review-session-title__primary">{remainingCount} remaining</span>
+              <span className="review-session-title__secondary">
+                {reviewedCount} reviewed
+                {remainingEstimate ? ` · ${remainingEstimate.durationLabel} left` : ''}
+              </span>
+            </div>
+          </IonTitle>
           {current && (
             <IonButtons slot="end">
               <IonButton fill="clear" color="medium" onClick={() => history.push(`/capture/${current.id}`)}>
@@ -297,13 +338,8 @@ const ReviewQueuePage: React.FC = () => {
             </IonButtons>
           )}
         </IonToolbar>
-        <IonToolbar>
-          <IonTitle size="small" color="medium">
-            {position} of {initialTotal}
-          </IonTitle>
-        </IonToolbar>
       </IonHeader>
-      <IonContent fullscreen className="ion-padding review-page">
+      <IonContent fullscreen className="review-page review-page--session">
         {current && (
           <div className="review-session">
             <ReviewSwipeCard

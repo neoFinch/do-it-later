@@ -1,447 +1,591 @@
-# Capture Inbox Product Roadmap
+# Capture Inbox Roadmap
 
-# Vision
+> **Vision**
+>
+> Capture anything in seconds. Review intentionally. Build a connected knowledge base powered by AI.
 
-Capture Inbox is a personal **Attention Operating System**.
+---
 
-Its purpose is **not** to help people save more content.
+# Guiding Principles
 
-Its purpose is to help people make better decisions about where to
-invest their limited time and attention.
+Every feature should reinforce one or more of these principles:
 
-Every captured item should eventually answer five questions:
+1. **Capture frictionlessly**
+   - Anything can be captured in seconds.
+   - The user should never worry about organization while capturing.
 
-1.  What is this?
-2.  Who is it for?
-3.  Is it worth my time?
-4.  Why?
-5.  What should I do next?
+2. **Review intentionally**
+   - Users should review captures regularly instead of letting them pile up forever.
 
-The success of the product is measured not by how many links are saved,
-but by how many hours of unnecessary reading or watching are avoided.
+3. **Extract ideas, not just content**
+   - Articles, videos and tweets are sources.
+   - Ideas are what users actually want to keep.
 
-------------------------------------------------------------------------
+4. **Connect knowledge automatically**
+   - AI should build relationships between ideas without requiring manual effort.
 
-# North Star Metric
+5. **Resurface knowledge at the right time**
+   - Information should return when it becomes useful again.
 
-## **Attention Saved**
+---
 
-Rather than measuring the number of captures or daily active users,
-Capture Inbox measures the value it creates by helping users avoid
-wasting time.
+# Product Vision
 
-Example metrics:
+Capture Inbox should evolve through four stages.
 
--   ⏳ Time saved by skipping low-value content
--   📚 High-value resources completed
--   🚫 Duplicate or low-value content avoided
--   🎯 Recommendation accuracy
--   📈 Weekly learning progress
-
-Example dashboard:
-
-``` text
-This Week
-
-⏳ Time Saved: 2h 45m
-
-📚 High-Value Resources Completed: 6
-
-🚫 Low-Value Resources Skipped: 11
-
-🎯 Recommendation Accuracy: 87%
+```
+Capture
+    ↓
+Understand
+    ↓
+Review
+    ↓
+Knowledge
 ```
 
-------------------------------------------------------------------------
+Eventually the application should feel less like a bookmark manager and more like a personal knowledge assistant.
 
-# V1.0 --- Capture Foundation ✅
+---
 
-## Goal
+# Priority P0 — Core Product
 
-Capture content from anywhere.
+These features define the product and should be completed before a public launch.
 
-## Features
+---
 
--   Android Share Intent
--   URL Capture
--   Note Capture
--   Local SQLite Storage
--   Offline Support
--   Search
--   Metadata Extraction
--   Source Detection
--   Thumbnail Extraction
--   Open Original Content
+## 1. Daily Review
 
-## Version Outcome
+**Status:** In Progress
 
-The application becomes a reliable inbox for interesting content from
-anywhere on the web.
+The Daily Review is the heart of the application.
 
-------------------------------------------------------------------------
+Users should develop a habit:
 
-# V1.1 --- Inbox Management ✅
+```
+Capture throughout the day
 
-## Goal
+↓
 
-Introduce lifecycle management.
+Review once a day
 
-## Features
+↓
 
--   Inbox
--   Reviewed
--   Archived
--   Status Filters
--   Counters
--   Archive
--   Restore
+Save valuable ideas
 
-## Version Outcome
+↓
 
-Users stop treating every saved item as equally important.
-
-The Inbox becomes a list of items that still require a decision.
-
-------------------------------------------------------------------------
-
-# V1.2 --- Review Queue ✅
-
-## Goal
-
-Reduce inbox clutter and encourage regular review.
-
-## Features
-
--   Review Queue
--   Open
--   Keep
--   Delete
--   Skip
--   Session Summary
-
-## Version Outcome
-
-Users develop a habit of processing captured content instead of
-endlessly collecting it.
-
-------------------------------------------------------------------------
-
-# V2.0 --- AI Content Understanding
-
-## Goal
-
-Teach the application what every capture actually contains.
-
-## Why
-
-Before AI can help decide attention, it must first understand the content.
-Extracted `ContentDocument` is durable; analysis is a versioned schema that
-can evolve (see [AI-Architecture.md](./AI-Architecture.md)).
-
-## Features
-
-For every captured item:
-
--   Extract article text / YouTube transcript into `ContentDocument`
--   One structured AI analysis pass (`ContentAnalysis`, schema-versioned)
--   Pluggable providers: OpenAI, Ollama (default path)
-
-Store structured metadata (lean triage set; fields may version):
-
-``` ts
-schemaVersion: number
-lens: "technology" | "science" | "health" | "art" | "movie" | ... | "general"
-topics: string[]
-targetAudience: string[]
-estimatedReadingTime: number | null
-estimatedWatchTime: number | null
-contentType: string
-summary: string
-viewerExpectation: { youWillGet: string[]; youWillNotGet: string[] }
-expectedValue: "low" | "medium" | "high"
-lensFields: object  // domain pack (tech: hands-on; movie: genre; health: ...)
-recommendation: string
-reasoning: string
-confidence: number
+Discard the rest
 ```
 
-Analysis must **not** force every capture through a software-learning lens.
-Detect a lens, then apply that pack’s criteria and fields.
+### Improvements
 
-## Version Outcome
+- Rename "Today's Review" → "Daily Review"
+- Show remaining captures instead of only progress
+- Better review time estimation
+- Completion screen
+- Smooth swipe animations
+- Keyboard shortcuts (Desktop)
+- Review highest-value captures first (future)
 
-The application understands every saved item instead of treating it as
-just another URL — without locking into multi-stage AI storage yet.
+---
 
-------------------------------------------------------------------------
+## 2. AI Analysis Pipeline
 
-# V2.1 --- AI Attention Assistant
+Continue improving the AI enrichment pipeline.
 
-## Goal
+Current stages:
 
-Help users decide whether a piece of content deserves their attention.
+- Understanding
+- Classification
+- Enrichment
+- Evaluation
 
-## Features
+Future additions:
 
-For every capture, derive an **Attention Decision** from analysis
-(deterministic, **lens-aware** scorecard preferred):
+- Idea extraction
+- Reading difficulty
+- Estimated usefulness
+- Novelty score
+- Similarity score
 
--   Worth Your Time Score
--   Read Now / Read Later / Skip
--   Estimated Effort
--   Expectation framing (you will / won't get — not always “learn”)
--   Lens-specific highlights (e.g. hands-on for tech, genre for movies)
--   Clear reasoning
+---
 
-Example:
+## 3. Backend Infrastructure
 
-``` text
-Worth Reading
+Current architecture
 
-★★★★★
+```
+SQLite
 
-Recommendation:
-Read Now
++
 
-Reason:
-- Practical tutorial
-- Contains code
-- Intermediate difficulty
-- Builds useful concepts
-
-Estimated Time:
-20 minutes
+User OpenAI API Key
 ```
 
-## Version Outcome
+Target architecture
 
-Users stop asking:
+```
+Desktop / Mobile
 
-> "What did I save?"
+↓
 
-and begin asking:
+Backend API
 
-> "What should I read today?"
+↓
 
-------------------------------------------------------------------------
+AI Services
 
-# V2.1a --- On-device Local LLM (experimental)
+↓
 
-## Goal
+Database
 
-Explore `@capacitor/local-llm` as an optional provider on top of the same
-analysis contract — not a replacement for OpenAI/Ollama.
+↓
 
-## Scope
-
--   Availability / download UX (`systemAvailability`, Android download)
--   Short tasks only when available (topics, one-line summary)
--   Hard fallback to cloud/Ollama for full analysis, web, and unsupported devices
-
-## Non-goals
-
--   Not the default inference path
--   Not required for V2.0 / V2.1 triage to ship
-
-------------------------------------------------------------------------
-
-# V2.2 --- Duplicate & Overlap Detection
-
-## Goal
-
-Prevent users from consuming the same information repeatedly.
-
-## Features
-
--   Similar content detection
--   Duplicate detection
--   Better alternative suggestions
-
-Example:
-
-``` text
-90% Similar
-
-Redis Explained
-Redis Internals
-Caching Deep Dive
-
-Recommendation:
-Skip
-
-Reason:
-You already have higher quality resources covering the same concepts.
+Sync
 ```
 
-## Version Outcome
+Goals
 
-The application actively protects the user's attention instead of merely
-storing information.
+- Authentication
+- Sync across devices
+- Background AI processing
+- Remove API key requirement
+- Push notifications
+- Usage tracking
 
-------------------------------------------------------------------------
+---
 
-# V2.3 --- Personal Learning Profile
+## 4. Desktop Application
 
-## Goal
+**Status:** Planned
 
-Understand the user.
+Desktop should become the preferred environment for reviewing and managing knowledge.
 
-## Features
+Why?
 
-Maintain:
+Reviewing hundreds of captures is significantly faster on desktop.
 
-### Current Interests
+Features
 
--   AI Agents
--   Backend
--   Rust
--   Electron
--   Distributed Systems
+- Native desktop experience (Deno Desktop)
+- Keyboard-first navigation
+- Global shortcuts
+- Drag & Drop
+- Multiple windows (future)
+- System tray
+- Clipboard watcher (future)
 
-### Learning Goals
+---
 
--   Become better at System Design
--   Learn Low-Level Programming
--   Master AI Engineering
+# Priority P1 — AI Intelligence
 
-### Preferred Content
+These features make Capture Inbox feel intelligent instead of simply organized.
 
--   Hands-on tutorials
--   Code examples
--   Practical projects
+---
 
-Use this profile to personalize recommendations.
+## 5. Similar Knowledge Detection
 
-## Version Outcome
+Instead of saying
 
-Recommendations become personal rather than generic.
+> Duplicate
 
-The same article may receive different recommendations for different
-users.
+AI should say
 
-------------------------------------------------------------------------
+> Similar ideas already exist.
 
-# V2.4 --- Daily Focus
+Questions AI should answer:
 
-## Goal
+- Have I already learned this?
+- What is actually new?
+- What ideas overlap?
+- Is this worth saving?
 
-Turn captured knowledge into a daily learning habit.
+Example
 
-## Features
+```
+Similar to
 
-Daily digest:
+• Deep Work
+• Focus Notes
 
-``` text
-Today's Best Use of Your Time
+New
 
-1. Redis Memory Model
-★★★★★
-25 min
+✓ Background music research
 
-2. OAuth Security
-★★★★☆
-15 min
+Repeated
 
-3. Skip these today
-Mostly duplicates
+✕ Silence improves focus
+✕ Notifications reduce productivity
 ```
 
-Future:
+---
 
--   Push notifications
--   Email digest
+## 6. AI Priority Queue
 
-## Version Outcome
+Instead of reviewing randomly,
 
-The app becomes something users open every morning, not only when saving
-content.
+review by importance.
 
-------------------------------------------------------------------------
+Ranking factors
 
-# V3.0 --- Personal Knowledge Graph
+- Importance
+- Novelty
+- Confidence
+- Reading time
+- User interests
 
-## Goal
+High-value captures should appear first.
 
-Transform captured content into connected knowledge.
+---
 
-## Features
+## 7. Idea Extraction
 
--   Semantic Search
--   Related Content
--   Learning Paths
--   Topic Clusters
--   Knowledge Graph
+The application should eventually stop treating articles as the primary entity.
 
-Example:
+Instead
 
-``` text
-Redis
- ↓
-Memory
- ↓
-Caching
- ↓
-Distributed Systems
- ↓
-CAP Theorem
+```
+Article
+
+↓
+
+Ideas
 ```
 
-## Version Outcome
+Example
 
-The application evolves from an inbox into a searchable knowledge
-system.
+Article:
 
-------------------------------------------------------------------------
+"10 Productivity Tips"
 
-# V3.1 --- AI Learning Companion
+Extracted ideas
 
-## Goal
+- Time Blocking
+- Deep Work
+- Habit Stacking
 
-Guide long-term learning.
+Each idea becomes searchable and reusable.
 
-## Features
+---
 
-Questions like:
+# Priority P2 — Knowledge Management
 
--   I have 30 minutes. What should I study?
--   I'm preparing for backend interviews. Which saved resources should I
-    prioritize?
--   What concepts am I repeatedly ignoring?
--   Explain this article using concepts I've already learned.
+This is where Capture Inbox becomes more than a read-it-later application.
 
-## Version Outcome
+---
 
-The application becomes a learning mentor rather than a bookmark
-manager.
+## 8. Knowledge Graph
 
-------------------------------------------------------------------------
+Inspired by Obsidian.
 
-# V4.0 --- Attention Operating System
+Unlike Obsidian, relationships should be generated automatically.
 
-## Goal
+Example
 
-Become the user's intelligence layer for information consumption.
+```
+Backend
 
-The application continuously learns from:
+├── SQL
+├── Redis
+├── Authentication
+├── APIs
+```
 
--   Saved content
--   Opened content
--   Ignored content
--   Archived content
--   Reading history
--   Learning goals
--   Interests
--   Available time
+Articles connect to ideas.
 
-It helps users decide:
+Ideas connect to other ideas.
 
--   What to consume
--   What to postpone
--   What to ignore
--   What to revisit
--   What to learn next
+Users should be able to explore their knowledge visually.
 
-## Version Outcome
+---
 
-Capture Inbox becomes a trusted decision-making assistant that helps
-users spend their attention wisely instead of simply storing links.
+## 9. AI Relationships
+
+Automatically detect
+
+- Parent ideas
+- Child ideas
+- Related ideas
+- Dependencies
+
+Example
+
+```
+Backend
+
+↓
+
+SQL
+
+↓
+
+Indexes
+
+↓
+
+Query Optimization
+```
+
+---
+
+## 10. AI Collections
+
+Instead of folders,
+
+AI creates collections.
+
+Examples
+
+- Learning Rust
+- Vacation Planning
+- Productivity
+- Backend Engineering
+
+No manual organization required.
+
+---
+
+## 11. Knowledge Resurfacing
+
+Examples
+
+> You saved this six months ago.
+
+or
+
+> This connects with something you captured yesterday.
+
+Help users remember instead of simply storing information.
+
+---
+
+# Priority P3 — Capture Experience
+
+Improve the ways users can capture information.
+
+---
+
+## 12. Voice Notes
+
+Pipeline
+
+```
+Voice
+
+↓
+
+Speech to Text
+
+↓
+
+AI Cleanup
+
+↓
+
+Summary
+
+↓
+
+Ideas
+```
+
+---
+
+## 13. Image OCR
+
+Support
+
+- Whiteboards
+- Books
+- Screenshots
+- Handwritten notes
+
+Extract
+
+- Text
+- Ideas
+- Topics
+
+---
+
+## 14. Browser Extensions
+
+Support
+
+- Chrome
+- Firefox
+- Edge
+
+One-click capture from anywhere.
+
+---
+
+## 15. Email Forwarding
+
+Forward newsletters directly into Capture Inbox.
+
+```
+Newsletter
+
+↓
+
+Capture Inbox
+
+↓
+
+AI Analysis
+
+↓
+
+Review Queue
+```
+
+---
+
+## 16. Offline Capture
+
+Allow captures while offline.
+
+Automatically synchronize later.
+
+---
+
+# Long-Term Vision
+
+These ideas should not distract from the MVP but define the future direction.
+
+---
+
+## Knowledge Score
+
+Visualize where knowledge is concentrated.
+
+Example
+
+```
+Backend      ★★★★★
+
+Psychology   ★★★★
+
+Finance      ★★
+
+Fitness      ★★★
+```
+
+---
+
+## Learning Gaps
+
+AI should suggest
+
+> You understand Redis.
+
+Next recommended topic
+
+→ Cache Invalidation
+
+---
+
+## Merge Similar Ideas
+
+Instead of
+
+Save
+
+Offer
+
+Merge
+
+```
+Existing Idea
+
++
+
+New Idea
+
+↓
+
+Updated Knowledge
+```
+
+---
+
+## Knowledge Timeline
+
+Visualize learning over time.
+
+```
+Rust
+
+↓
+
+Ownership
+
+↓
+
+Borrow Checker
+
+↓
+
+Async
+
+↓
+
+Tokio
+```
+
+---
+
+## Personal Knowledge Assistant
+
+Eventually users should be able to ask
+
+- What do I know about SQL?
+- Summarize everything I've learned about React.
+- Show everything related to Authentication.
+- What ideas connect Backend and AI?
+
+---
+
+# Technical Improvements
+
+- Improve prompt quality
+- Prompt versioning
+- Background workers
+- Vector search
+- Better SQLite indexing
+- Event-driven architecture
+- Analytics
+- Crash reporting
+
+---
+
+# Current Development Order
+
+1. Finish Daily Review
+2. Build Desktop Application
+3. Introduce Backend & Authentication
+4. AI Similar Knowledge Detection
+5. Idea Extraction
+6. Knowledge Graph
+7. Voice Capture
+8. Browser Extensions
+9. Knowledge Assistant
+
+---
+
+# Definition of Success
+
+Capture Inbox succeeds when users no longer think of it as a bookmarking app.
+
+Instead, they should feel that it is a system that:
+
+- Captures information effortlessly.
+- Helps them decide what matters.
+- Extracts meaningful ideas.
+- Connects those ideas automatically.
+- Gradually builds a searchable personal knowledge base.
+
+The goal is not to collect more content.
+
+The goal is to help users build better knowledge.

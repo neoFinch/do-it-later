@@ -1,8 +1,9 @@
 .review-swipe {
   position: relative;
-  min-height: 26rem;
+  flex: 1;
+  min-height: 0;
   display: flex;
-  align-items: center;
+  align-items: stretch;
   justify-content: center;
 }
 
@@ -18,16 +19,16 @@
   letter-spacing: 0.04em;
   text-transform: uppercase;
   pointer-events: none;
-  z-index: 0;
+  z-index: 2;
 }
 
 .review-swipe__hint--skip {
-  left: 0.25rem;
+  left: 0.75rem;
   color: var(--ion-color-medium);
 }
 
 .review-swipe__hint--save {
-  right: 0.25rem;
+  right: 0.75rem;
   color: var(--ion-color-success, #2dd36f);
 }
 
@@ -35,8 +36,10 @@
   position: relative;
   z-index: 1;
   width: 100%;
-  max-width: 26rem;
-  border-radius: 20px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  border-radius: 12px;
   overflow: hidden;
   background: var(--app-surface, var(--ion-background-color));
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.12);
@@ -44,6 +47,7 @@
   cursor: grab;
   will-change: transform, opacity;
   user-select: none;
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .review-swipe__card--dragging {
@@ -55,40 +59,44 @@
 }
 
 .review-swipe__preview {
+  flex: 1;
+  min-height: 12rem;
   background: var(--ion-color-step-150, #2a2a2a);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
 }
 
 .review-swipe__preview img {
   width: 100%;
-  max-height: 14rem;
+  height: 100%;
   object-fit: cover;
   display: block;
 }
 
 .review-swipe__preview--placeholder {
-  min-height: 8rem;
+  min-height: 12rem;
 }
 
 .review-swipe__body {
-  padding: 1rem 1.1rem 0.35rem;
+  flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.6rem;
+  padding: 0.7rem 1rem;
 }
 
 .review-swipe__title {
   margin: 0;
   font-size: var(--app-font-size-lg);
-  line-height: 1.35;
+  line-height: 1.15;
 }
 
 .review-swipe__meta {
-  margin-top: 0.45rem;
+  margin: 0;
   font-size: var(--app-font-size-sm);
   color: var(--ion-color-medium);
-}
-
-.review-swipe__tap-hint {
-  margin: 0;
-  padding: 0 1.1rem 1rem;
-  font-size: var(--app-font-size-xs);
-  color: var(--ion-color-medium);
-  text-align: center;
+  line-height: 1.15;
 }
