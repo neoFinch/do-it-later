@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import { IonIcon, IonText } from '@ionic/react';
+import { IonIcon } from '@ionic/react';
 import { arrowBackOutline, arrowForwardOutline } from 'ionicons/icons';
 import { Capture } from '../types/capture';
 import { useCapturePreview } from '../hooks/useCapturePreview';
@@ -9,7 +9,7 @@ import './ReviewSwipeCard.css';
 
 const SWIPE_THRESHOLD_PX = 88;
 const TAP_MOVE_THRESHOLD_PX = 10;
-const EXIT_ANIMATION_MS = 240;
+const EXIT_ANIMATION_MS = 280;
 
 type SwipeDirection = 'left' | 'right';
 
@@ -35,10 +35,10 @@ const ReviewSwipeCard: React.FC<ReviewSwipeCardProps> = ({
   const [dragX, setDragX] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
+  const [committed, setCommitted] = useState(false);
   const pointerStartX = useRef(0);
   const pointerStartY = useRef(0);
   const moved = useRef(false);
-  const committed = useRef(false);
 
   const getExitOffset = (direction: SwipeDirection) => {
     const width = typeof window !== 'undefined' ? window.innerWidth : 420;
@@ -47,11 +47,11 @@ const ReviewSwipeCard: React.FC<ReviewSwipeCardProps> = ({
 
   const commitSwipe = useCallback(
     (direction: SwipeDirection) => {
-      if (disabled || committed.current) {
+      if (disabled || committed) {
         return;
       }
 
-      committed.current = true;
+      setCommitted(true);
       setIsDragging(false);
       setIsAnimating(true);
       setDragX(getExitOffset(direction));
@@ -64,11 +64,11 @@ const ReviewSwipeCard: React.FC<ReviewSwipeCardProps> = ({
         }
       }, EXIT_ANIMATION_MS);
     },
-    [disabled, onSave, onSkip]
+    [disabled, committed, onSave, onSkip]
   );
 
   const onPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (disabled || committed.current || isAnimating) {
+    if (disabled || committed || isAnimating) {
       return;
     }
 
@@ -80,7 +80,7 @@ const ReviewSwipeCard: React.FC<ReviewSwipeCardProps> = ({
   };
 
   const onPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (!isDragging || disabled || committed.current) {
+    if (!isDragging || disabled || committed) {
       return;
     }
 
@@ -96,7 +96,7 @@ const ReviewSwipeCard: React.FC<ReviewSwipeCardProps> = ({
   };
 
   const onPointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (!isDragging || disabled || committed.current) {
+    if (!isDragging || disabled || committed) {
       return;
     }
 
@@ -127,7 +127,7 @@ const ReviewSwipeCard: React.FC<ReviewSwipeCardProps> = ({
   };
 
   const onPointerCancel = () => {
-    if (committed.current) {
+    if (committed) {
       return;
     }
     setIsDragging(false);
@@ -140,7 +140,7 @@ const ReviewSwipeCard: React.FC<ReviewSwipeCardProps> = ({
   const saveOpacity = Math.min(1, Math.max(0, dragX / SWIPE_THRESHOLD_PX));
   const skipOpacity = Math.min(1, Math.max(0, -dragX / SWIPE_THRESHOLD_PX));
   const cardTransition = isDragging ? 'none' : `transform ${EXIT_ANIMATION_MS}ms ease-out, opacity ${EXIT_ANIMATION_MS}ms ease-out`;
-  const cardOpacity = committed.current ? 0 : 1;
+  const cardOpacity = committed ? 0 : 1;
 
   return (
     <div className="review-swipe">
@@ -157,7 +157,7 @@ const ReviewSwipeCard: React.FC<ReviewSwipeCardProps> = ({
         className={[
           'review-swipe__card',
           isDragging ? 'review-swipe__card--dragging' : '',
-          committed.current ? 'review-swipe__card--committed' : ''
+          committed ? 'review-swipe__card--committed' : ''
         ]
           .filter(Boolean)
           .join(' ')}
@@ -180,17 +180,12 @@ const ReviewSwipeCard: React.FC<ReviewSwipeCardProps> = ({
         )}
 
         <div className="review-swipe__body">
-          <IonText>
-            <h2 className="review-swipe__title">{getCaptureDisplayTitle(capture)}</h2>
-          </IonText>
-          <div className="review-swipe__meta">
-            {consumeLabel && <span>{consumeLabel}</span>}
-            {consumeLabel && <span aria-hidden="true"> · </span>}
-            <span>{formatRelativeSavedAt(capture.createdAt)}</span>
-          </div>
+          <h2 className="review-swipe__title">{getCaptureDisplayTitle(capture)}</h2>
+          <span className="review-swipe__meta">
+            {consumeLabel && <>{consumeLabel} · </>}
+            {formatRelativeSavedAt(capture.createdAt)}
+          </span>
         </div>
-
-        <p className="review-swipe__tap-hint">Tap to open</p>
       </div>
     </div>
   );
