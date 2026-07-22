@@ -140,6 +140,25 @@
   height: 100%;
 }
 
+@media (min-width: 768px) {
+  .review-page--session {
+    --padding-top: 0.75rem;
+    --padding-bottom: 1rem;
+    --padding-start: 1.25rem;
+    --padding-end: 1.25rem;
+  }
+
+  .review-session {
+    max-width: 36rem;
+    margin: 0 auto;
+  }
+
+  .review-intro {
+    max-width: 28rem;
+    margin-top: 3rem;
+  }
+}
+
 .review-session__actions {
   display: grid;
   grid-template-columns: 1fr 1fr;

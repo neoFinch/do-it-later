@@ -129,3 +129,49 @@
   font-size: var(--app-font-size-xs);
   color: var(--ion-color-medium);
 }
+
+.inbox-body {
+  width: 100%;
+}
+
+.inbox-desktop-hint {
+  margin: 0.75rem 1rem 0;
+  font-size: var(--app-font-size-sm);
+  color: var(--ion-color-medium);
+}
+
+.inbox-drop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  background: color-mix(in srgb, var(--ion-color-primary) 18%, transparent);
+  border: 2px dashed var(--ion-color-primary);
+  margin: 0.75rem;
+  border-radius: 16px;
+  font-size: var(--app-font-size-lg);
+  font-weight: 600;
+  color: var(--ion-text-color);
+}
+
+@media (min-width: 768px) {
+  .inbox-page--desktop .inbox-body {
+    max-width: 56rem;
+    margin: 0 auto;
+  }
+
+  .capture-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+    padding: 0 16px 24px;
+  }
+}
+
+@media (min-width: 1100px) {
+  .capture-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}

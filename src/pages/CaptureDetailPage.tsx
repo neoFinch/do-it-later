@@ -341,6 +341,9 @@ const CaptureDetailPage: React.FC = () => {
         setCapture(result.capture);
         setTitleDraft(getCaptureDisplayTitle(result.capture));
       }
+      if (result.document) {
+        setDocument(result.document);
+      }
       await loadUnderstanding(capture.id);
       setToastMessage(result.userMessage);
     } catch (error) {

@@ -15,6 +15,7 @@ import {
 import { arrowBackOutline, arrowForwardOutline, checkmarkCircleOutline, playOutline } from 'ionicons/icons';
 import { useHistory } from 'react-router-dom';
 import ReviewSwipeCard from '../components/ReviewSwipeCard';
+import { useReviewKeyboard } from '../hooks/useReviewKeyboard';
 import { listCaptures } from '../services/capture.service';
 import { getCaptureLink, openLink } from '../services/link.service';
 import {
@@ -24,6 +25,7 @@ import {
 } from '../services/review-session.service';
 import { useCaptureStore } from '../store/captureStore';
 import { Capture } from '../types/capture';
+import { prefersDesktopUx } from '../utils/platform';
 import './ReviewQueuePage.css';
 
 interface SessionStats {
@@ -196,6 +198,29 @@ const ReviewQueuePage: React.FC = () => {
     history.replace('/');
   };
 
+  const openDetails = useCallback(() => {
+    if (!current) {
+      return;
+    }
+    history.push(`/capture/${current.id}`);
+  }, [current, history]);
+
+  const desktopUx = prefersDesktopUx();
+
+  useReviewKeyboard(phase === 'loading' ? 'loading' : phase, {
+    onStart: startReview,
+    onSave: () => {
+      void handleSave();
+    },
+    onSkip: handleSkip,
+    onOpen: () => {
+      void handleOpen();
+    },
+    onDetails: openDetails,
+    onExit: exitToInbox,
+    onReviewSkipped: startDeferredReview
+  });
+
   const header = (
     <IonHeader>
       <IonToolbar>
@@ -241,6 +266,13 @@ const ReviewQueuePage: React.FC = () => {
               <li>Swipe left — Skip</li>
               <li>Swipe right — Save</li>
               <li>Tap — Open</li>
+              {desktopUx && (
+                <>
+                  <li>← / X — Skip · → / S — Save</li>
+                  <li>Enter — Open · Esc — Inbox</li>
+                  <li>Enter or Space — Start</li>
+                </>
+              )}
             </ul>
           </div>
         </IonContent>
@@ -363,7 +395,11 @@ const ReviewQueuePage: React.FC = () => {
               </IonButton>
             </div>
 
-            <p className="review-session__legend">Swipe left to skip · Swipe right to save · Tap to open</p>
+            <p className="review-session__legend">
+              {desktopUx
+                ? '← skip · → save · Enter open · Esc exit'
+                : 'Swipe left to skip · Swipe right to save · Tap to open'}
+            </p>
           </div>
         )}
       </IonContent>

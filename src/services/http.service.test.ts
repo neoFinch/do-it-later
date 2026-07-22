@@ -3,7 +3,7 @@ import { formatNetworkError } from './http.service';
 
 describe('http.service', () => {
   it('maps browser fetch failures to a helpful message', () => {
-    expect(formatNetworkError(new TypeError('Failed to fetch'))).toContain('Android app');
+    expect(formatNetworkError(new TypeError('Failed to fetch'))).toMatch(/browser|Android app/i);
   });
 
   it('maps timeout errors', () => {

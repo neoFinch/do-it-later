@@ -89,6 +89,18 @@ export const extractCapture = async (captureId: string, options?: { force?: bool
       await saveContentDocument(extraction.document);
       await setExtractionStatus(captureId, 'completed', null);
 
+      // Prior failed extracts mark analysis as skipped; clear that so Analyze can run.
+      const processing = await getCaptureProcessing(captureId);
+      if (
+        processing?.analysisStatus === 'skipped' &&
+        processing.analysisError?.includes('no usable content')
+      ) {
+        await updateProcessing(captureId, {
+          analysisStatus: 'pending',
+          analysisError: null
+        });
+      }
+
       if (extraction.document.thumbnail && !capture.thumbnail && capture.type === 'url') {
         const { materializeCaptureThumbnail, updateCapture, patchInboxCaptureIfInitialized } = await import(
           './capture.service'
