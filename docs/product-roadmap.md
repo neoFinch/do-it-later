@@ -157,7 +157,7 @@ Goals
 
 ## 4. Desktop Application
 
-**Status:** Planned
+**Status:** In Progress (web/desktop UX first; native shell later)
 
 Desktop should become the preferred environment for reviewing and managing knowledge.
 
@@ -167,10 +167,11 @@ Reviewing hundreds of captures is significantly faster on desktop.
 
 Features
 
-- Native desktop experience (Deno Desktop)
-- Keyboard-first navigation
+- Keyboard-first navigation (web/desktop — done in app UX)
+- Paste URL + drag/drop capture (web — done in app UX)
+- Native desktop experience (Capacitor Electron next; Deno Desktop later)
 - Global shortcuts
-- Drag & Drop
+- Drag & Drop (OS-level beyond in-window)
 - Multiple windows (future)
 - System tray
 - Clipboard watcher (future)

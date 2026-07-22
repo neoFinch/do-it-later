@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   IonButton,
   IonButtons,
@@ -15,7 +15,8 @@ import {
   IonRefresherContent,
   IonIcon,
   IonSegment,
-  IonSegmentButton
+  IonSegmentButton,
+  IonToast
 } from '@ionic/react';
 import { useHistory } from 'react-router-dom';
 import { addOutline, archiveOutline, checkmarkCircleOutline, fileTrayFullOutline, gridOutline, listOutline, playOutline, refreshOutline, settingsOutline } from 'ionicons/icons';
@@ -24,6 +25,9 @@ import { Capture, CaptureStatus } from '../types/capture';
 import { useShallow } from 'zustand/react/shallow';
 import CaptureListItem from '../components/CaptureListItem';
 import CaptureGrid from '../components/CaptureGrid';
+import { useDesktopCapture } from '../hooks/useDesktopCapture';
+import { prefersDesktopUx, isWebRuntime } from '../utils/platform';
+import { formatSaveError } from '../utils/save-error';
 import './InboxPage.css';
 
 type InboxViewMode = 'list' | 'grid';
@@ -36,15 +40,11 @@ const STATUS_TABS: { status: CaptureStatus; icon: string; label: string }[] = [
   { status: 'ARCHIVED', icon: archiveOutline, label: 'Archived' }
 ];
 
-const STATUS_LABELS: Record<CaptureStatus, string> = {
-  INBOX: 'Inbox',
-  REVIEWED: 'Reviewed',
-  ARCHIVED: 'Archived'
-};
-
-const getEmptyStateMessage = (status: CaptureStatus): string => {
+const getEmptyStateMessage = (status: CaptureStatus, desktopUx: boolean): string => {
   if (status === 'INBOX') {
-    return 'No captures yet. Use Quick Add or share a URL to save content.';
+    return desktopUx
+      ? 'No captures yet. Paste a URL, drop a link, or use Quick Add.'
+      : 'No captures yet. Use Quick Add or share a URL to save content.';
   }
   if (status === 'REVIEWED') {
     return 'No reviewed captures yet. Mark items as reviewed from their detail page.';
@@ -65,18 +65,59 @@ const InboxPage: React.FC = () => {
   const history = useHistory();
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<InboxViewMode>(readViewMode);
-  const { captures, loading, init, search, reload, statusFilter, statusCounts, setStatusFilter } = useCaptureStore(
-    useShallow((state) => ({
-      captures: state.captures,
-      loading: state.loading,
-      init: state.init,
-      search: state.search,
-      reload: state.reload,
-      statusFilter: state.statusFilter,
-      statusCounts: state.statusCounts,
-      setStatusFilter: state.setStatusFilter
-    }))
+  const [toastMessage, setToastMessage] = useState('');
+  const [capturing, setCapturing] = useState(false);
+  const desktopUx = prefersDesktopUx();
+  const { captures, loading, init, search, reload, statusFilter, statusCounts, setStatusFilter, addUrlCapture } =
+    useCaptureStore(
+      useShallow((state) => ({
+        captures: state.captures,
+        loading: state.loading,
+        init: state.init,
+        search: state.search,
+        reload: state.reload,
+        statusFilter: state.statusFilter,
+        statusCounts: state.statusCounts,
+        setStatusFilter: state.setStatusFilter,
+        addUrlCapture: state.addUrlCapture
+      }))
+    );
+
+  const captureUrl = useCallback(
+    async (url: string) => {
+      if (capturing) {
+        return;
+      }
+      setCapturing(true);
+      try {
+        await addUrlCapture(url);
+        setToastMessage('Link saved to inbox.');
+        if (statusFilter !== 'INBOX') {
+          await setStatusFilter('INBOX');
+        } else {
+          await reload({ silent: true });
+        }
+      } catch (error) {
+        console.error('InboxPage: desktop capture failed', error);
+        setToastMessage(formatSaveError(error));
+      } finally {
+        setCapturing(false);
+      }
+    },
+    [addUrlCapture, capturing, reload, setStatusFilter, statusFilter]
   );
+
+  const desktopCaptureHandlers = useMemo(
+    () => ({
+      onUrl: captureUrl,
+      onFiles: async () => {
+        setToastMessage('File drop is not supported yet — paste a URL or use Quick Add.');
+      }
+    }),
+    [captureUrl]
+  );
+
+  const { isDragging } = useDesktopCapture(desktopCaptureHandlers, { enabled: isWebRuntime() });
 
   useEffect(() => {
     (async () => {
@@ -141,7 +182,7 @@ const InboxPage: React.FC = () => {
   );
 
   return (
-    <IonPage>
+    <IonPage className={desktopUx ? 'inbox-page inbox-page--desktop' : 'inbox-page'}>
       <IonHeader>
         <IonToolbar>
           <IonTitle className="app-brand-title">Offload</IonTitle>
@@ -183,51 +224,67 @@ const InboxPage: React.FC = () => {
         <IonRefresher slot="fixed" onIonRefresh={doRefresh}>
           <IonRefresherContent />
         </IonRefresher>
-        <div className="inbox-search-row">
-          <IonSearchbar
-            className="inbox-search-row__search"
-            value={searchTerm}
-            onIonChange={onSearch}
-            placeholder="Search saved capture"
-          />
-          {statusCounts.INBOX > 0 && (
+        <div className="inbox-body">
+          {desktopUx && (
+            <p className="inbox-desktop-hint">Paste a URL anywhere, or drop a link onto this page.</p>
+          )}
+          <div className="inbox-search-row">
+            <IonSearchbar
+              className="inbox-search-row__search"
+              value={searchTerm}
+              onIonChange={onSearch}
+              placeholder="Search saved capture"
+            />
+            {statusCounts.INBOX > 0 && (
+              <IonButton
+                fill="clear"
+                color="tertiary"
+                className="inbox-search-row__action"
+                aria-label={`Start review (${statusCounts.INBOX} captures)`}
+                onClick={() => history.push('/review')}
+              >
+                <IonIcon icon={playOutline} slot="icon-only" />
+              </IonButton>
+            )}
             <IonButton
               fill="clear"
-              color="tertiary"
+              color="medium"
               className="inbox-search-row__action"
-              aria-label={`Start review (${statusCounts.INBOX} captures)`}
-              onClick={() => history.push('/review')}
+              aria-label={viewMode === 'list' ? 'Switch to grid view' : 'Switch to list view'}
+              onClick={toggleViewMode}
             >
-              <IonIcon icon={playOutline} slot="icon-only" />
+              <IonIcon icon={viewMode === 'list' ? gridOutline : listOutline} slot="icon-only" />
             </IonButton>
+          </div>
+          {loading || capturing ? (
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '1rem' }}>
+              <IonSpinner name="crescent" />
+            </div>
+          ) : captures.length === 0 ? (
+            <div style={{ padding: '1.5rem' }}>
+              <IonText color="medium">{getEmptyStateMessage(statusFilter, desktopUx)}</IonText>
+            </div>
+          ) : viewMode === 'grid' ? (
+            <CaptureGrid captures={captures} onSelect={openCapture} />
+          ) : (
+            <IonList lines="none">
+              {captures.map((capture) => (
+                <CaptureListItem key={capture.id} capture={capture} onSelect={openCapture} />
+              ))}
+            </IonList>
           )}
-          <IonButton
-            fill="clear"
-            color="medium"
-            className="inbox-search-row__action"
-            aria-label={viewMode === 'list' ? 'Switch to grid view' : 'Switch to list view'}
-            onClick={toggleViewMode}
-          >
-            <IonIcon icon={viewMode === 'list' ? gridOutline : listOutline} slot="icon-only" />
-          </IonButton>
         </div>
-        {loading ? (
-          <div style={{ display: 'flex', justifyContent: 'center', padding: '1rem' }}>
-            <IonSpinner name="crescent" />
+        {isDragging && (
+          <div className="inbox-drop-overlay" aria-live="polite">
+            Drop link to save
           </div>
-        ) : captures.length === 0 ? (
-          <div style={{ padding: '1.5rem' }}>
-            <IonText color="medium">{getEmptyStateMessage(statusFilter)}</IonText>
-          </div>
-        ) : viewMode === 'grid' ? (
-          <CaptureGrid captures={captures} onSelect={openCapture} />
-        ) : (
-          <IonList lines="none">
-            {captures.map((capture) => (
-              <CaptureListItem key={capture.id} capture={capture} onSelect={openCapture} />
-            ))}
-          </IonList>
         )}
+        <IonToast
+          isOpen={Boolean(toastMessage)}
+          message={toastMessage}
+          duration={2200}
+          onDidDismiss={() => setToastMessage('')}
+        />
       </IonContent>
     </IonPage>
   );

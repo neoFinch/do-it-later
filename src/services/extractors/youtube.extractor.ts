@@ -210,32 +210,36 @@ const fetchInnertubePlayer = async (
   clientName: 'ANDROID' | 'WEB',
   clientVersion: string
 ): Promise<PlayerCaptions | null> => {
-  const endpoint = `https://www.youtube.com/youtubei/v1/player?key=${encodeURIComponent(apiKey)}`;
-  const { status, data } = await postRemote(endpoint, {
-    headers: {
-      'User-Agent': YOUTUBE_USER_AGENT,
-      'X-Youtube-Client-Name': clientName === 'ANDROID' ? '3' : '1',
-      'X-Youtube-Client-Version': clientVersion
-    },
-    data: {
-      context: {
-        client: {
-          clientName,
-          clientVersion,
-          hl: 'en',
-          gl: 'US',
-          ...(clientName === 'ANDROID' ? { androidSdkVersion: 30 } : {})
-        }
+  try {
+    const endpoint = `https://www.youtube.com/youtubei/v1/player?key=${encodeURIComponent(apiKey)}`;
+    const { status, data } = await postRemote(endpoint, {
+      headers: {
+        'User-Agent': YOUTUBE_USER_AGENT,
+        'X-Youtube-Client-Name': clientName === 'ANDROID' ? '3' : '1',
+        'X-Youtube-Client-Version': clientVersion
       },
-      videoId
-    }
-  });
+      data: {
+        context: {
+          client: {
+            clientName,
+            clientVersion,
+            hl: 'en',
+            gl: 'US',
+            ...(clientName === 'ANDROID' ? { androidSdkVersion: 30 } : {})
+          }
+        },
+        videoId
+      }
+    });
 
-  if (status >= 400 || !data || typeof data !== 'object') {
+    if (status >= 400 || !data || typeof data !== 'object') {
+      return null;
+    }
+
+    return data as PlayerCaptions;
+  } catch {
     return null;
   }
-
-  return data as PlayerCaptions;
 };
 
 const fetchCaptionTracks = async (videoId: string, watchHtml: string): Promise<CaptionTrack[]> => {

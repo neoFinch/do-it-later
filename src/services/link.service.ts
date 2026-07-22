@@ -75,23 +75,29 @@ export const extractFirstUrl = (text: string): string | null => {
   return match ? match[0] : null;
 };
 
+/** Strip trailing junk (e.g. `/` from pasted watch URLs) from a YouTube video id. */
+const sanitizeYouTubeVideoId = (raw: string | null | undefined): string | null => {
+  const match = raw?.trim().match(/^[\w-]+/);
+  return match?.[0] ?? null;
+};
+
 export const extractYouTubeVideoId = (url: string): string | null => {
   try {
     const parsed = new URL(normalizeUrl(url));
     const host = parsed.hostname.replace(/^www\./, '');
 
     if (host === 'youtu.be') {
-      return parsed.pathname.slice(1).split('/')[0] || null;
+      return sanitizeYouTubeVideoId(parsed.pathname.slice(1).split('/')[0]);
     }
 
     if (host.includes('youtube.com') || host === 'youtube-nocookie.com') {
       if (parsed.pathname === '/watch') {
-        return parsed.searchParams.get('v');
+        return sanitizeYouTubeVideoId(parsed.searchParams.get('v'));
       }
 
       const pathMatch = parsed.pathname.match(/^\/(shorts|live|embed)\/([^/?]+)/);
       if (pathMatch) {
-        return pathMatch[2];
+        return sanitizeYouTubeVideoId(pathMatch[2]);
       }
     }
   } catch {
