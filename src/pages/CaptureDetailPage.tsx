@@ -29,6 +29,7 @@ import { getCapture } from '../services/capture.service';
 import { useCaptureStore } from '../store/captureStore';
 import { Capture, CaptureStatus } from '../types/capture';
 import { useCapturePreview } from '../hooks/useCapturePreview';
+import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import { isImageMime, isImagePath, isLegacyLocalFilePath } from '../services/file.service';
 import { getCaptureLink, getOpenLinkLabel, openLink, detectLinkPlatform } from '../services/link.service';
 import { getCaptureDisplayTitle, titlesAreEquivalent } from '../services/title.service';
@@ -36,13 +37,12 @@ import { getCaptureSourceBadge } from '../utils/capture-source';
 import { formatRelativeSavedAt } from '../utils/format-date';
 import { getContentConsumeLabel } from '../utils/content-duration';
 import { getCaptureUnderstanding, analyzeCapture } from '../services/processing.service';
+import { OFFLINE_ERROR_MESSAGE } from '../services/network.service';
 import { refreshCaptureMedia, refreshCaptureThumbnail } from '../services/capture-refresh.service';
-import { hasUsableExtractedContent } from '../services/extractors/document-body';
 import { AIAnalysis } from '../types/ai-analysis';
 import { CaptureProcessing } from '../types/capture-processing';
 import { ContentDocument } from '../types/content-document';
-import CaptureExtractedContent from '../components/CaptureExtractedContent';
-import CaptureAiInsights from '../components/CaptureAiInsights';
+import CaptureProcessingTimeline from '../components/CaptureProcessingTimeline';
 import './CaptureDetailPage.css';
 
 const STATUS_LABELS: Record<CaptureStatus, string> = {
@@ -199,6 +199,7 @@ const CaptureDetailPage: React.FC = () => {
   const [extractionBusy, setExtractionBusy] = useState(false);
   const [thumbnailRetryBusy, setThumbnailRetryBusy] = useState(false);
   const [analysisBusy, setAnalysisBusy] = useState(false);
+  const { online } = useNetworkStatus();
   const { removeCapture, updateCaptureTitle, updateCaptureStatus } = useCaptureStore();
 
   const loadUnderstanding = async (captureId: string) => {
@@ -364,14 +365,27 @@ const CaptureDetailPage: React.FC = () => {
       return;
     }
 
+    if (!online) {
+      setToastMessage(OFFLINE_ERROR_MESSAGE);
+      return;
+    }
+
     setAnalysisBusy(true);
     try {
       await analyzeCapture(capture.id, { force: true });
-      await loadUnderstanding(capture.id);
+      const understanding = await getCaptureUnderstanding(capture.id);
+      setProcessing(understanding.processing);
+      setAnalysis(understanding.analysis);
+
+      if (understanding.processing?.analysisStatus === 'failed') {
+        setToastMessage(understanding.processing.analysisError ?? 'Analysis failed.');
+        return;
+      }
+
       setToastMessage('Content analysis updated.');
     } catch (error) {
       console.error('Failed to analyze capture', error);
-      setToastMessage('Analysis failed.');
+      setToastMessage(error instanceof Error ? error.message : 'Analysis failed.');
     } finally {
       setAnalysisBusy(false);
     }
@@ -398,11 +412,6 @@ const CaptureDetailPage: React.FC = () => {
   }
 
   const showUnderstanding = capture.type !== 'file';
-  const extractionBlocked =
-    processing?.extractionStatus === 'failed' || processing?.extractionStatus === 'skipped';
-  const hasAnalyzableContent = !!document && hasUsableExtractedContent(document);
-  // Only show triage UI when we actually have content to judge — not for blocked Instagram/etc.
-  const showInsights = hasAnalyzableContent && !extractionBlocked;
 
   const captureLink = getCaptureLink(capture);
   const badge = getCaptureSourceBadge(capture);
@@ -472,25 +481,19 @@ const CaptureDetailPage: React.FC = () => {
           </div>
 
           {showUnderstanding && (
-            <>
-              <CaptureExtractedContent
-                processing={processing}
-                document={document}
-                busy={extractionBusy}
-                missingThumbnail={capture.type === 'url' && !capture.thumbnail}
-                onRetry={handleRetryExtraction}
-                onOpenLink={captureLink ? handleOpenLink : undefined}
-                openLinkLabel={captureLink ? getOpenLinkLabel(captureLink) : undefined}
-              />
-              {showInsights && (
-                <CaptureAiInsights
-                  processing={processing}
-                  analysis={analysis}
-                  busy={analysisBusy}
-                  onAnalyze={handleAnalyze}
-                />
-              )}
-            </>
+            <CaptureProcessingTimeline
+              processing={processing}
+              document={document}
+              analysis={analysis}
+              extractionBusy={extractionBusy}
+              analysisBusy={analysisBusy}
+              offline={!online}
+              missingThumbnail={capture.type === 'url' && !capture.thumbnail}
+              onRetryExtraction={handleRetryExtraction}
+              onAnalyze={handleAnalyze}
+              onOpenLink={captureLink ? handleOpenLink : undefined}
+              openLinkLabel={captureLink ? getOpenLinkLabel(captureLink) : undefined}
+            />
           )}
 
           <section className="capture-detail__section">

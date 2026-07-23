@@ -1,8 +1,12 @@
-import { CapacitorHttp } from '@capacitor/core';
+import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import { getAppRuntime, isElectronShell, isWebRuntime } from '../utils/platform';
 import { detectLinkPlatform } from './link.service';
+import { assertNetworkOnline } from './network.service';
 
 const DEFAULT_TIMEOUT_MS = 15_000;
+const NATIVE_DNS_RETRY_ATTEMPTS = 3;
+const NATIVE_DNS_RETRY_DELAY_MS = 2_000;
+const DNS_ERROR_PATTERN = /unable to resolve|no address associated|unknownhost|enotfound/i;
 export const WEB_REMOTE_TEXT_PROXY_PATH = '/api/remote-text';
 export const WEB_REMOTE_JSON_PROXY_PATH = '/api/remote-json';
 export const WEB_REMOTE_IMAGE_PROXY_PATH = '/api/remote-image';
@@ -26,8 +30,31 @@ export interface PostRemoteOptions {
   data: unknown;
 }
 
+const isDnsResolutionError = (error: unknown): boolean => {
+  const message = error instanceof Error ? error.message : String(error);
+  return DNS_ERROR_PATTERN.test(message);
+};
+
+const sleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+
 export const formatNetworkError = (error: unknown): string => {
   const message = error instanceof Error ? error.message : String(error);
+
+  if (isDnsResolutionError(error)) {
+    const runtime = getAppRuntime();
+    if (runtime === 'android' || runtime === 'ios') {
+      return 'Could not reach the server. Check your internet connection, turn off VPN or private DNS/ad blockers, then try again.';
+    }
+    if (isElectronShell()) {
+      return 'Could not reach the server from the desktop app. Check your connection and try again.';
+    }
+    if (isWebRuntime()) {
+      return 'Could not reach the server from the browser. Check your connection and try again.';
+    }
+  }
 
   if (
     message === 'Failed to fetch' ||
@@ -72,6 +99,10 @@ const shouldUseRemoteProxy = (): boolean => {
   }
   if (isElectronShell()) {
     return true;
+  }
+  // Mobile native always uses CapacitorHttp — never the web/Electron proxy.
+  if (Capacitor.isNativePlatform()) {
+    return false;
   }
   return getAppRuntime() === 'web';
 };
@@ -169,6 +200,8 @@ const fetchRemoteTextViaProxy = async (url: string, options: FetchTextOptions = 
 };
 
 export const fetchRemoteText = async (url: string, options: FetchTextOptions = {}): Promise<string> => {
+  assertNetworkOnline();
+
   if (shouldUseWebRemoteProxy()) {
     return fetchRemoteTextViaProxy(url, options);
   }
@@ -201,6 +234,8 @@ export const fetchRemoteText = async (url: string, options: FetchTextOptions = {
 };
 
 export const fetchRemoteImageBase64 = async (url: string, options: FetchImageOptions = {}): Promise<string> => {
+  assertNetworkOnline();
+
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
   if (shouldUseWebRemoteProxy()) {
@@ -282,10 +317,51 @@ export const fetchRemoteImageBase64 = async (url: string, options: FetchImageOpt
   }
 };
 
+const postRemoteNative = async (
+  url: string,
+  options: PostRemoteOptions
+): Promise<{ status: number; data: unknown }> => {
+  const timeoutMs = options.timeoutMs ?? 60_000;
+  const request = () =>
+    CapacitorHttp.post({
+      url,
+      connectTimeout: timeoutMs,
+      readTimeout: timeoutMs,
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+      },
+      data: options.data
+    });
+
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt < NATIVE_DNS_RETRY_ATTEMPTS; attempt += 1) {
+    try {
+      const response = await request();
+      return { status: response.status, data: response.data };
+    } catch (error) {
+      lastError = error;
+      const canRetry = attempt < NATIVE_DNS_RETRY_ATTEMPTS - 1 && isDnsResolutionError(error);
+      if (!canRetry) {
+        break;
+      }
+      await sleep(NATIVE_DNS_RETRY_DELAY_MS);
+    }
+  }
+
+  if (lastError instanceof Error && lastError.message.startsWith('HTTP ')) {
+    throw lastError;
+  }
+  throw new Error(formatNetworkError(lastError));
+};
+
 export const postRemote = async (
   url: string,
   options: PostRemoteOptions
 ): Promise<{ status: number; data: unknown }> => {
+  assertNetworkOnline();
+
   const timeoutMs = options.timeoutMs ?? 60_000;
 
   if (shouldUseWebRemoteProxy()) {
@@ -328,20 +404,5 @@ export const postRemote = async (
     }
   }
 
-  try {
-    const response = await CapacitorHttp.post({
-      url,
-      connectTimeout: timeoutMs,
-      readTimeout: timeoutMs,
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-      },
-      data: options.data
-    });
-
-    return { status: response.status, data: response.data };
-  } catch (error) {
-    throw new Error(formatNetworkError(error));
-  }
+  return postRemoteNative(url, options);
 };

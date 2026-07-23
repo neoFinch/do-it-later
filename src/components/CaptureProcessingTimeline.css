@@ -1,0 +1,189 @@
+.processing-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  align-items: center;
+}
+
+.processing-timeline__section-label {
+  margin: 0 0 0.85rem;
+  align-self: stretch;
+  text-align: center;
+}
+
+.processing-timeline__steps {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  width: 100%;
+  align-items: center;
+}
+
+.processing-timeline__step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  width: 100%;
+}
+
+.processing-timeline__rail {
+  display: flex;
+  justify-content: center;
+  padding-top: 0.1rem;
+}
+
+.processing-timeline__connector {
+  display: block;
+  width: 2px;
+  height: 0.75rem;
+  background: var(--app-border-subtle, var(--ion-color-step-200, #dedede));
+  flex-shrink: 0;
+}
+
+.processing-timeline__connector--between-steps {
+  height: 1.25rem;
+}
+
+.processing-timeline__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 50%;
+  background: var(--ion-background-color, #fff);
+  border: 2px solid var(--app-border-subtle, var(--ion-color-step-200, #dedede));
+  color: var(--ion-color-medium);
+}
+
+.processing-timeline__icon ion-icon {
+  font-size: 1rem;
+}
+
+.processing-timeline__icon ion-spinner {
+  width: 1rem;
+  height: 1rem;
+}
+
+.processing-timeline__icon--completed {
+  border-color: var(--ion-color-success, #2dd36f);
+  color: var(--ion-color-success, #2dd36f);
+  background: var(--ion-background-color, #fff);
+}
+
+.processing-timeline__icon--failed {
+  border-color: var(--ion-color-danger, #eb445a);
+  color: var(--ion-color-danger, #eb445a);
+  background: var(--ion-background-color, #fff);
+}
+
+.processing-timeline__icon--locked {
+  border-color: var(--ion-color-step-250, #c8c8c8);
+  color: var(--ion-color-medium);
+  background: var(--ion-color-step-50, #f7f7f7);
+}
+
+.processing-timeline__icon--active {
+  border-color: var(--ion-color-primary);
+  color: var(--ion-color-primary);
+  background: var(--ion-background-color, #fff);
+}
+
+.processing-timeline__body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.45rem;
+  width: 100%;
+  min-width: 0;
+}
+
+.processing-timeline__body--card {
+  border: 1px solid var(--app-border-subtle, var(--ion-color-step-200, #dedede));
+  border-radius: 16px;
+  background: var(--ion-background-color, #fff);
+  padding: 1rem 1.1rem;
+}
+
+.processing-timeline__body--extract-success,
+.processing-timeline__body--ai-success {
+  border-color: rgba(var(--ion-color-success-rgb, 45, 211, 111), 0.35);
+  background: var(--ion-background-color, #fff);
+}
+
+.processing-timeline__body--extract-success .processing-timeline__title,
+.processing-timeline__body--ai-success .processing-timeline__title {
+  color: var(--ion-text-color);
+}
+
+.processing-timeline__body--extract-success .processing-timeline__message {
+  color: var(--ion-color-medium);
+}
+
+.processing-timeline__body--locked {
+  border-color: var(--ion-color-step-250, #c8c8c8);
+  background: var(--ion-color-step-50, #f7f7f7);
+}
+
+.processing-timeline__body--failed {
+  border-color: rgba(var(--ion-color-danger-rgb, 235, 68, 90), 0.45);
+  background: rgba(var(--ion-color-danger-rgb, 235, 68, 90), 0.06);
+}
+
+.processing-timeline__title {
+  margin: 0;
+  font-size: var(--app-font-size-md);
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--ion-text-color);
+}
+
+.processing-timeline__message {
+  margin: 0;
+  font-size: var(--app-font-size-sm);
+  line-height: 1.45;
+  color: var(--ion-color-medium);
+}
+
+.processing-timeline__message--danger {
+  color: var(--ion-color-danger, #eb445a);
+}
+
+.processing-timeline__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+  width: 100%;
+}
+
+.processing-timeline__actions ion-button {
+  margin: 0;
+}
+
+.processing-timeline__view-text {
+  margin: 0;
+}
+
+.processing-timeline__insights {
+  margin-top: 0.35rem;
+  width: 100%;
+  text-align: left;
+}
+
+.processing-timeline__body .capture-extracted__error,
+.processing-timeline__body .ai-insights__error {
+  justify-content: center;
+}
+
+.processing-timeline__step--completed .processing-timeline__title {
+  font-size: var(--app-font-size-sm);
+  font-weight: 600;
+}
+
+.processing-timeline__step--completed .processing-timeline__message {
+  font-size: var(--app-font-size-md);
+  color: var(--ion-text-color);
+}

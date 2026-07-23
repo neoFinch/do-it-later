@@ -10,6 +10,12 @@ describe('http.service', () => {
     expect(formatNetworkError(new Error('Request timed out'))).toContain('timed out');
   });
 
+  it('maps DNS resolution failures to a helpful message', () => {
+    expect(
+      formatNetworkError(new Error('Unable to resolve host "api.openai.com": No address associated with hostname'))
+    ).toMatch(/Could not reach the server/i);
+  });
+
   it('passes through other errors', () => {
     expect(formatNetworkError(new Error('HTTP 403'))).toBe('HTTP 403');
   });
