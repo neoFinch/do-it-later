@@ -8,6 +8,8 @@ import {
 } from '@ionic/react';
 import { processPendingShares } from './services/share.service';
 import { IonReactRouter } from '@ionic/react-router';
+import { useNetworkStatus } from './hooks/useNetworkStatus';
+import OfflineBanner from './components/OfflineBanner';
 import InboxPage from './pages/InboxPage';
 import QuickAddPage from './pages/QuickAddPage';
 import CaptureDetailPage from './pages/CaptureDetailPage';
@@ -42,6 +44,7 @@ console.log('App: setupIonicReact called');
 
 const App: React.FC = () => {
   console.log('App: render');
+  const { online } = useNetworkStatus();
 
   useEffect(() => {
     if (Capacitor.getPlatform() === 'web') {
@@ -65,6 +68,7 @@ const App: React.FC = () => {
 
   return (
     <IonApp>
+      {!online && <OfflineBanner />}
       <IonReactRouter>
         <Switch>
           <Route exact path="/">

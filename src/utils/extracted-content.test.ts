@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { getExtractedText } from './CaptureExtractedContent';
+import { getExtractedText } from './extracted-content';
 import { ContentDocument } from '../types/content-document';
 
-describe('CaptureExtractedContent helpers', () => {
+describe('extracted-content helpers', () => {
   it('prefers transcript over article text', () => {
     const document: ContentDocument = {
       captureId: 'c1',

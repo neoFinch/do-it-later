@@ -1,0 +1,18 @@
+.offline-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.55rem 1rem;
+  background: var(--ion-color-warning);
+  color: var(--ion-color-warning-contrast);
+  font-size: var(--app-font-size-sm, 0.875rem);
+  line-height: 1.35;
+  text-align: center;
+  z-index: 1000;
+}
+
+.offline-banner ion-icon {
+  flex-shrink: 0;
+  font-size: 1.1rem;
+}
