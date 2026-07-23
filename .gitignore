@@ -10,6 +10,11 @@
 
 # production
 /dist
+/electron/app
+/electron/build
+/electron/dist
+/electron/generated
+/electron/vendor
 
 # misc
 *.app

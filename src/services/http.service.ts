@@ -1,9 +1,12 @@
 import { CapacitorHttp } from '@capacitor/core';
-import { isWebRuntime } from '../utils/platform';
+import { getAppRuntime, isElectronShell, isWebRuntime } from '../utils/platform';
+import { detectLinkPlatform } from './link.service';
 
 const DEFAULT_TIMEOUT_MS = 15_000;
 export const WEB_REMOTE_TEXT_PROXY_PATH = '/api/remote-text';
 export const WEB_REMOTE_JSON_PROXY_PATH = '/api/remote-json';
+export const WEB_REMOTE_IMAGE_PROXY_PATH = '/api/remote-image';
+export const ELECTRON_REMOTE_PROXY_ORIGIN = 'http://127.0.0.1:31999';
 
 export interface FetchTextOptions {
   timeoutMs?: number;
@@ -35,7 +38,9 @@ export const formatNetworkError = (error: unknown): string => {
   ) {
     return isWebRuntime()
       ? 'Could not reach the page from the browser. Start the app with `npm run dev` (metadata proxy) or use the Android app.'
-      : 'Could not reach the page. Check your connection, or use the installed Android app to extract content from URLs.';
+      : isElectronShell()
+        ? 'Could not reach the page from the desktop app. Check your connection and try again.'
+        : 'Could not reach the page. Check your connection, or use the installed Android app to extract content from URLs.';
   }
 
   if (message.toLowerCase().includes('abort') || message.toLowerCase().includes('timeout')) {
@@ -58,15 +63,59 @@ const normalizeResponseText = (data: unknown): string => {
   return String(data);
 };
 
-const shouldUseWebRemoteProxy = (): boolean => {
-  if (!isWebRuntime() || typeof window === 'undefined') {
+const shouldUseRemoteProxy = (): boolean => {
+  if (typeof window === 'undefined') {
     return false;
   }
-  // Vitest / non-app pages shouldn't hit the Vite middleware.
   if (import.meta.env.MODE === 'test') {
     return false;
   }
-  return true;
+  if (isElectronShell()) {
+    return true;
+  }
+  return getAppRuntime() === 'web';
+};
+
+const getRemoteProxyOrigin = (): string => {
+  if (isElectronShell()) {
+    return ELECTRON_REMOTE_PROXY_ORIGIN;
+  }
+  return '';
+};
+
+const shouldUseWebRemoteProxy = shouldUseRemoteProxy;
+
+export const shouldProxyRemoteImage = (imageUrl: string, pageUrl?: string): boolean => {
+  if (pageUrl) {
+    const platform = detectLinkPlatform(pageUrl);
+    if (platform === 'instagram' || platform === 'tiktok') {
+      return true;
+    }
+  }
+
+  try {
+    const host = new URL(imageUrl).hostname.toLowerCase();
+    return host.includes('cdninstagram.com') || host.includes('fbcdn.net') || host.includes('tiktokcdn');
+  } catch {
+    return false;
+  }
+};
+
+export const buildRemoteImageProxyUrl = (url: string, options: FetchImageOptions = {}): string => {
+  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const params = new URLSearchParams({
+    url,
+    timeoutMs: String(timeoutMs)
+  });
+
+  if (options.userAgent) {
+    params.set('ua', options.userAgent);
+  }
+  if (options.referer) {
+    params.set('referer', options.referer);
+  }
+
+  return `${getRemoteProxyOrigin()}${WEB_REMOTE_IMAGE_PROXY_PATH}?${params.toString()}`;
 };
 
 const fetchRemoteTextViaProxy = async (url: string, options: FetchTextOptions = {}): Promise<string> => {
@@ -87,7 +136,7 @@ const fetchRemoteTextViaProxy = async (url: string, options: FetchTextOptions = 
   const timer = window.setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    const response = await fetch(`${WEB_REMOTE_TEXT_PROXY_PATH}?${params.toString()}`, {
+    const response = await fetch(`${getRemoteProxyOrigin()}${WEB_REMOTE_TEXT_PROXY_PATH}?${params.toString()}`, {
       signal: controller.signal
     });
 
@@ -153,6 +202,51 @@ export const fetchRemoteText = async (url: string, options: FetchTextOptions = {
 
 export const fetchRemoteImageBase64 = async (url: string, options: FetchImageOptions = {}): Promise<string> => {
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+
+  if (shouldUseWebRemoteProxy()) {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const response = await fetch(buildRemoteImageProxyUrl(url, options), {
+        signal: controller.signal
+      });
+
+      if (!response.ok) {
+        let message = `Proxy HTTP ${response.status}`;
+        try {
+          const parsed = (await response.json()) as { error?: string };
+          if (parsed.error) {
+            message = parsed.error;
+          }
+        } catch {
+          // Ignore non-JSON error bodies.
+        }
+        throw new Error(message);
+      }
+
+      const blob = await response.blob();
+      const arrayBuffer = await blob.arrayBuffer();
+      const bytes = new Uint8Array(arrayBuffer);
+      if (!bytes.length) {
+        throw new Error('Empty image response');
+      }
+
+      let binary = '';
+      for (let i = 0; i < bytes.length; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      return btoa(binary);
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith('HTTP ')) {
+        throw error;
+      }
+      throw new Error(formatNetworkError(error));
+    } finally {
+      window.clearTimeout(timer);
+    }
+  }
+
   const headers: Record<string, string> = {
     Accept: 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
     'User-Agent': options.userAgent ?? 'Mozilla/5.0 (compatible; CaptureInbox/1.0)'
@@ -199,7 +293,7 @@ export const postRemote = async (
     const timer = window.setTimeout(() => controller.abort(), timeoutMs);
 
     try {
-      const response = await fetch(WEB_REMOTE_JSON_PROXY_PATH, {
+      const response = await fetch(`${getRemoteProxyOrigin()}${WEB_REMOTE_JSON_PROXY_PATH}`, {
         method: 'POST',
         signal: controller.signal,
         headers: { 'Content-Type': 'application/json' },

@@ -1,4 +1,3 @@
-import { Capacitor } from '@capacitor/core';
 import {
   CaptureProcessing,
   createDefaultProcessingState,
@@ -6,8 +5,9 @@ import {
   PipelineStatus
 } from '../types/capture-processing';
 import { getDatabase, initDatabase } from './sqlite';
+import { usesBrowserStorage } from '../utils/platform';
 
-const isWeb = Capacitor.getPlatform() === 'web';
+const isWeb = usesBrowserStorage();
 const STORAGE_KEY = 'later:capture_processing_v2';
 const LEGACY_STORAGE_KEY = 'later:capture_processing_v1';
 

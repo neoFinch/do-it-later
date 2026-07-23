@@ -1,0 +1,20 @@
+{
+  "name": "offload-electron",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Electron platform project for Offload.",
+  "main": "build/main.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "env -u ELECTRON_RUN_AS_NODE electron .",
+    "pack": "npm run build && capacitor-electron vendor && env -u ELECTRON_RUN_AS_NODE electron-builder --config electron-builder.config.js"
+  },
+  "dependencies": {
+    "@capawesome/capacitor-electron": "^0.1.0"
+  },
+  "devDependencies": {
+    "electron": "^43.2.0",
+    "electron-builder": "^26.0.12",
+    "typescript": "^5.5.0"
+  }
+}

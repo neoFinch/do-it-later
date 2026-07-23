@@ -1,5 +1,5 @@
-import { Capacitor } from '@capacitor/core';
 import { CapacitorSQLite, SQLiteConnection, SQLiteDBConnection } from '@capacitor-community/sqlite';
+import { usesBrowserStorage } from '../utils/platform';
 
 const DATABASE_NAME = 'capture_inbox';
 const DATABASE_VERSION = 6;
@@ -448,7 +448,7 @@ const closeConnection = async (): Promise<void> => {
 };
 
 const deleteLocalDatabase = async (): Promise<void> => {
-  if (Capacitor.getPlatform() === 'web') {
+  if (usesBrowserStorage()) {
     return;
   }
 
@@ -462,7 +462,7 @@ const deleteLocalDatabase = async (): Promise<void> => {
 const openFreshConnection = async (): Promise<SQLiteDBConnection> => {
   const connection = getSqliteConnection();
 
-  if (Capacitor.getPlatform() === 'web') {
+  if (usesBrowserStorage()) {
     await connection.initWebStore();
   }
 
@@ -503,7 +503,7 @@ const initializeOnce = async (allowReset: boolean): Promise<void> => {
     await closeConnection();
     databaseReady = null;
 
-    if (allowReset && Capacitor.getPlatform() !== 'web') {
+    if (allowReset && !usesBrowserStorage()) {
       await deleteLocalDatabase();
       sqliteConnection = null;
       return initializeOnce(false);

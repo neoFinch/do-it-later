@@ -1,4 +1,3 @@
-import { Capacitor } from '@capacitor/core';
 import {
   ClassifyResult,
   composeAnalysisFromStages,
@@ -13,8 +12,9 @@ import { AIAnalysis, AnalysisLens, ContentType, ExpectationLevel } from '../type
 import { normalizeLens } from '../services/ai/lenses';
 import { parseJsonArray, stringifyJsonArray } from '../utils/json-field';
 import { getDatabase, initDatabase } from './sqlite';
+import { usesBrowserStorage } from '../utils/platform';
 
-const isWeb = Capacitor.getPlatform() === 'web';
+const isWeb = usesBrowserStorage();
 const STORAGE_KEY = 'later:ai_pipeline_v1';
 
 const VALID_CONTENT_TYPES: ContentType[] = [

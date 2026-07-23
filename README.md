@@ -2,7 +2,7 @@
 
 Personal **Attention Operating System** — capture content from anywhere, understand it, and decide whether it deserves your time.
 
-Stack: Ionic React, Capacitor (Android), SQLite, pluggable AI (OpenAI / Ollama / experimental on-device Local LLM).
+Stack: Ionic React, Capacitor (Android + Electron desktop), SQLite, pluggable AI (OpenAI / Ollama / experimental on-device Local LLM).
 
 Product and AI details live in [`docs/`](./docs/).
 
@@ -35,7 +35,8 @@ Parked and upcoming work. Order is approximate, not a commitment.
 
 ### Platform
 
-- [ ] **iOS** app target (Android is the current shell)
+- [ ] **iOS** app target (Android is the current mobile shell)
+- [x] **Desktop (Electron)** — macOS / Windows / Linux via `@capawesome/capacitor-electron` (`npm run desktop:run`)
 - [ ] Web analysis remains cloud/Ollama-only (on-device Local LLM unsupported on web)
 
 ### Product roadmap (not shipped)

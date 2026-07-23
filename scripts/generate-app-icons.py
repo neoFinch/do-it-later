@@ -4,6 +4,9 @@
 from __future__ import annotations
 
 import argparse
+import shutil
+import subprocess
+import sys
 from pathlib import Path
 
 from PIL import Image
@@ -49,6 +52,8 @@ WEB_ICONS = {
     ROOT / 'public/assets/icon/favicon.png': 64,
     ROOT / 'public/assets/icon/icon.png': 512,
 }
+
+ELECTRON_ASSETS = ROOT / 'electron/assets'
 
 WEB_SPLASH = ROOT / 'public/assets/branding/splash.png'
 DEFAULT_SOURCE = ROOT / 'assets/branding/offload-logo-source.jpg'
@@ -131,15 +136,77 @@ def prepare_logo(source: Path, processed: Path) -> Image.Image:
     return logo
 
 
-def build_master(logo: Image.Image, master: Path) -> None:
+def save_ico(image: Image.Image, destination: Path) -> None:
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    sizes = [16, 24, 32, 48, 64, 128, 256]
+    images = [image.resize((size, size), Image.Resampling.LANCZOS) for size in sizes]
+    images[0].save(
+        destination,
+        format='ICO',
+        sizes=[(img.width, img.height) for img in images],
+        append_images=images[1:],
+    )
+
+
+def save_icns(image: Image.Image, destination: Path) -> None:
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    if sys.platform != 'darwin':
+        print(f'Skipping {destination.name} (iconutil is macOS-only). electron-builder can generate it from icon.png.')
+        return
+
+    iconset = destination.with_suffix('.iconset')
+    if iconset.exists():
+        shutil.rmtree(iconset)
+    iconset.mkdir()
+
+    iconset_entries = [
+        ('icon_16x16.png', 16),
+        ('icon_16x16@2x.png', 32),
+        ('icon_32x32.png', 32),
+        ('icon_32x32@2x.png', 64),
+        ('icon_128x128.png', 128),
+        ('icon_128x128@2x.png', 256),
+        ('icon_256x256.png', 256),
+        ('icon_256x256@2x.png', 512),
+        ('icon_512x512.png', 512),
+        ('icon_512x512@2x.png', 1024),
+    ]
+
+    rgb = image.convert('RGBA')
+    for filename, size in iconset_entries:
+        resized = rgb.resize((size, size), Image.Resampling.LANCZOS)
+        resized.save(iconset / filename, format='PNG')
+
+    try:
+        subprocess.run(['iconutil', '-c', 'icns', str(iconset), '-o', str(destination)], check=True)
+    except subprocess.CalledProcessError:
+        print(f'Could not build {destination.name}; electron-builder will derive it from icon.png.')
+    finally:
+        shutil.rmtree(iconset, ignore_errors=True)
+
+
+def generate_electron_icons(master: Image.Image) -> None:
+    icon_png = ELECTRON_ASSETS / 'icon.png'
+    master.save(icon_png, format='PNG', optimize=True)
+    save_ico(master, ELECTRON_ASSETS / 'icon.ico')
+    save_icns(master, ELECTRON_ASSETS / 'icon.icns')
+    print(f'Electron icons: {ELECTRON_ASSETS}')
+
+
+def build_master(logo: Image.Image, master: Path) -> Image.Image:
     master.parent.mkdir(parents=True, exist_ok=True)
-    fit_on_canvas(logo, 1024, 1024, padding_ratio=ICON_PADDING).save(master, format='PNG', optimize=True)
+    fitted = fit_on_canvas(logo, 1024, 1024, padding_ratio=ICON_PADDING)
+    fitted.save(master, format='PNG', optimize=True)
+    return fitted
 
 
 def generate_icons(source: Path) -> None:
     logo = prepare_logo(source, PROCESSED_SOURCE)
     master_path = ROOT / 'assets/branding/offload-brand-master.png'
-    build_master(logo, master_path)
+    app_icon_master = ROOT / 'assets/branding/offload-app-icon-master.png'
+    master = build_master(logo, master_path)
+    master.save(app_icon_master, format='PNG', optimize=True)
+    generate_electron_icons(master)
     android_res = ROOT / 'android/app/src/main/res'
 
     for folder, size in ANDROID_LAUNCHER_SIZES.items():
