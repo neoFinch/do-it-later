@@ -4,7 +4,7 @@ Personal **Attention Operating System** — capture content from anywhere, under
 
 Stack: Ionic React, Capacitor (Android + Electron desktop), SQLite, pluggable AI (OpenAI / Ollama / experimental on-device Local LLM).
 
-Product and AI details live in [`docs/`](./docs/).
+Product and AI details live in [`playbook/`](./playbook/).
 
 ---
 
@@ -41,7 +41,7 @@ Parked and upcoming work. Order is approximate, not a commitment.
 
 ### Product roadmap (not shipped)
 
-From [`docs/product-roadmap.md`](./docs/product-roadmap.md):
+From [`playbook/01-product/roadmap.md`](./playbook/01-product/roadmap.md):
 
 - [ ] **V2.2** — Duplicate & overlap detection (“you already saved something similar”)
 - [ ] **V2.3** — Personal learning profile (interests, goals, preferred content)
@@ -52,7 +52,7 @@ From [`docs/product-roadmap.md`](./docs/product-roadmap.md):
 
 ### AI architecture (later expansion)
 
-From [`docs/AI-Architecture.md`](./docs/AI-Architecture.md):
+From [`playbook/02-ai/ai-pipeline.md`](./playbook/02-ai/ai-pipeline.md):
 
 - [ ] **User signals** — opened / completed / ignored / liked → personalization loop
 - [ ] **Split AI stages** — only if Understand / Classify / Enrich / Evaluate need to evolve independently
@@ -60,13 +60,13 @@ From [`docs/AI-Architecture.md`](./docs/AI-Architecture.md):
 
 ---
 
-## Docs
+## Playbook
 
 | Doc | Purpose |
 |-----|---------|
-| [docs/1Pager.md](./docs/1Pager.md) | Product one-pager |
-| [docs/product-principles.md](./docs/product-principles.md) | Principles |
-| [docs/product-roadmap.md](./docs/product-roadmap.md) | Version roadmap |
-| [docs/AI-Architecture.md](./docs/AI-Architecture.md) | AI pipeline & providers |
-| [docs/implementation.md](./docs/implementation.md) | Technical implementation |
+| [playbook/00-overview/vision.md](./playbook/00-overview/vision.md) | Product vision |
+| [playbook/00-overview/principles.md](./playbook/00-overview/principles.md) | Principles |
+| [playbook/01-product/roadmap.md](./playbook/01-product/roadmap.md) | Product roadmap |
+| [playbook/02-ai/ai-pipeline.md](./playbook/02-ai/ai-pipeline.md) | AI pipeline & providers |
+| [playbook/03-engineering/implementation-plan.md](./playbook/03-engineering/implementation-plan.md) | Technical implementation |
 | [scripts/README.md](./scripts/README.md) | Android helper scripts |
