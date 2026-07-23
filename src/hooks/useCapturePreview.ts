@@ -7,11 +7,20 @@ import {
   resolveCapturePreviewUrl,
   resolveThumbnailPreviewUrl
 } from '../services/file.service';
+import { buildRemoteImageProxyUrl, shouldProxyRemoteImage } from '../services/http.service';
+import { METADATA_USER_AGENT } from '../services/metadata.service';
+import { normalizeUrl } from '../services/link.service';
 import { resolveThumbnailForUrl } from '../services/thumbnail.service';
 
 const getSyncPreviewUrl = (capture: Capture): string | null => {
   if (capture.type === 'url') {
     if (capture.thumbnail && isRemoteHttpUrl(capture.thumbnail)) {
+      if (shouldProxyRemoteImage(capture.thumbnail, capture.url ?? undefined)) {
+        return buildRemoteImageProxyUrl(capture.thumbnail, {
+          referer: capture.url ? normalizeUrl(capture.url) : undefined,
+          userAgent: METADATA_USER_AGENT
+        });
+      }
       return capture.thumbnail;
     }
     return resolveThumbnailForUrl(capture.url ?? '') ?? null;
@@ -51,7 +60,7 @@ export const useCapturePreview = (capture: Capture): string | null => {
     (async () => {
       const url =
         capture.type === 'url' && capture.thumbnail && isPersistedCapturePath(capture.thumbnail)
-          ? await resolveThumbnailPreviewUrl(capture.thumbnail)
+          ? await resolveThumbnailPreviewUrl(capture.thumbnail, capture.url ?? undefined)
           : await resolveCapturePreviewUrl(capture);
 
       if (!cancelled) {

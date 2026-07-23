@@ -8,9 +8,9 @@ import {
   normalizeSearchQuery
 } from '../services/capture-search.service';
 import { getDatabase, initDatabase } from './sqlite';
-import { Capacitor } from '@capacitor/core';
+import { usesBrowserStorage } from '../utils/platform';
 
-const isWeb = Capacitor.getPlatform() === 'web';
+const isWeb = usesBrowserStorage();
 
 const DEFAULT_STATUS: CaptureStatus = 'INBOX';
 

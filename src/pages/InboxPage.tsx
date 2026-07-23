@@ -26,7 +26,7 @@ import { useShallow } from 'zustand/react/shallow';
 import CaptureListItem from '../components/CaptureListItem';
 import CaptureGrid from '../components/CaptureGrid';
 import { useDesktopCapture } from '../hooks/useDesktopCapture';
-import { prefersDesktopUx, isWebRuntime } from '../utils/platform';
+import { prefersDesktopUx, supportsDesktopCapture } from '../utils/platform';
 import { formatSaveError } from '../utils/save-error';
 import './InboxPage.css';
 
@@ -117,7 +117,7 @@ const InboxPage: React.FC = () => {
     [captureUrl]
   );
 
-  const { isDragging } = useDesktopCapture(desktopCaptureHandlers, { enabled: isWebRuntime() });
+  const { isDragging } = useDesktopCapture(desktopCaptureHandlers, { enabled: supportsDesktopCapture() });
 
   useEffect(() => {
     (async () => {

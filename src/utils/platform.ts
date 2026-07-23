@@ -12,7 +12,34 @@ export const getAppRuntime = (): AppRuntime => {
 
 export const isWebRuntime = (): boolean => getAppRuntime() === 'web';
 
+/** True in the Capacitor Electron shell (even if platform detection falls back to web). */
+export const isElectronShell = (): boolean => {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+  if (getAppRuntime() === 'electron') {
+    return true;
+  }
+  return '__capacitorElectronBridge' in window;
+};
+
 export const isNativeRuntime = (): boolean => Capacitor.isNativePlatform();
+
+/** Paste/drop URL capture in browser or Electron shell (not mobile native). */
+export const supportsDesktopCapture = (): boolean => {
+  const runtime = getAppRuntime();
+  return runtime === 'web' || runtime === 'electron';
+};
+
+/**
+ * Persist captures via browser localStorage (web + Electron).
+ * Mobile native uses SQLite; Electron will move to native SQLite when the plugin ships
+ * a Capawesome-compatible electron implementation.
+ */
+export const usesBrowserStorage = (): boolean => {
+  const runtime = getAppRuntime();
+  return runtime === 'web' || runtime === 'electron';
+};
 
 /** Wide viewport suitable for keyboard-first / desktop UX (browser or future Electron). */
 export const isDesktopViewport = (width = typeof window !== 'undefined' ? window.innerWidth : 0): boolean =>

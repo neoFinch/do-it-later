@@ -1,8 +1,8 @@
-import { Capacitor } from '@capacitor/core';
 import { ContentDocument } from '../types/content-document';
 import { getDatabase, initDatabase } from './sqlite';
+import { usesBrowserStorage } from '../utils/platform';
 
-const isWeb = Capacitor.getPlatform() === 'web';
+const isWeb = usesBrowserStorage();
 const STORAGE_KEY = 'later:content_documents_v1';
 
 const readStorage = (): ContentDocument[] => {

@@ -2,9 +2,10 @@ import { Capacitor } from '@capacitor/core';
 import { Directory, Filesystem } from '@capacitor/filesystem';
 import { Capture } from '../types/capture';
 import { detectLinkPlatform, normalizeUrl } from './link.service';
-import { fetchRemoteImageBase64 } from './http.service';
+import { buildRemoteImageProxyUrl, fetchRemoteImageBase64, shouldProxyRemoteImage } from './http.service';
 import { METADATA_USER_AGENT } from './metadata.service';
 import { resolveThumbnailForUrl } from './thumbnail.service';
+import { usesBrowserStorage } from '../utils/platform';
 
 export interface SharedFileInput {
   uri: string;
@@ -58,7 +59,7 @@ export const persistRemoteThumbnail = async (
   imageUrl: string,
   pageUrl: string
 ): Promise<string | null> => {
-  if (Capacitor.getPlatform() === 'web' || !shouldPersistRemoteThumbnail(imageUrl, pageUrl)) {
+  if (usesBrowserStorage() || !shouldPersistRemoteThumbnail(imageUrl, pageUrl)) {
     return null;
   }
 
@@ -84,12 +85,21 @@ export const persistRemoteThumbnail = async (
   }
 };
 
-export const resolveThumbnailPreviewUrl = async (thumbnail?: string | null): Promise<string | null> => {
+export const resolveThumbnailPreviewUrl = async (
+  thumbnail?: string | null,
+  pageUrl?: string
+): Promise<string | null> => {
   if (!thumbnail?.trim()) {
     return null;
   }
 
   if (isRemoteHttpUrl(thumbnail)) {
+    if (shouldProxyRemoteImage(thumbnail, pageUrl)) {
+      return buildRemoteImageProxyUrl(thumbnail, {
+        referer: pageUrl ? normalizeUrl(pageUrl) : undefined,
+        userAgent: METADATA_USER_AGENT
+      });
+    }
     return thumbnail;
   }
 

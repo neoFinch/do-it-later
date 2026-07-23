@@ -157,7 +157,7 @@ Goals
 
 ## 4. Desktop Application
 
-**Status:** In Progress (web/desktop UX first; native shell later)
+**Status:** In Progress (Electron shell; web UX done)
 
 Desktop should become the preferred environment for reviewing and managing knowledge.
 
@@ -168,8 +168,8 @@ Reviewing hundreds of captures is significantly faster on desktop.
 Features
 
 - Keyboard-first navigation (web/desktop — done in app UX)
-- Paste URL + drag/drop capture (web — done in app UX)
-- Native desktop experience (Capacitor Electron next; Deno Desktop later)
+- Paste URL + drag/drop capture (web + Electron — done in app UX)
+- Native desktop experience (Capacitor Electron — macOS / Windows / Linux)
 - Global shortcuts
 - Drag & Drop (OS-level beyond in-window)
 - Multiple windows (future)
